@@ -16,6 +16,11 @@ requires:
   - plugins.<platform>.credentials
 relatedTemplates:
   - install-config.yaml.tpl
+bundle: agent
+clusterRole:
+  - standalone
+  - hub
+bundleOrder: 5
 docs: https://docs.openshift.com/container-platform/latest/authentication/managing_cloud_provider_credentials/about-cloud-credential-operator.html
 -#}
 {%- set platform = cluster.platform | default('baremetal', true) -%}

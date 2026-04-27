@@ -17,6 +17,10 @@ relatedTemplates:
   - acm-capi-m3.yaml.tpl
   - acm-asc.yaml.tpl
   - acm-creds.yaml.tpl
+bundle: acm-ztp
+clusterRole:
+  - managed
+bundleOrder: 1
 docs: https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.11/html/clusters/cluster_mce_overview#ztp-intro
 -#}
 {%- set imageArch = cluster.arch | default("x86_64", true) -%}

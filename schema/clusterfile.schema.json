@@ -578,6 +578,22 @@
           "type": "boolean",
           "default": false,
           "description": "Pause cluster provisioning. The cluster is defined but not installed until this is set to false."
+        },
+        "installMethod": {
+          "title": "Install Method",
+          "x-group": "Basics",
+          "type": "string",
+          "enum": ["agent", "acm-ztp", "capi"],
+          "default": "agent",
+          "description": "How this cluster is installed. agent = self-contained ISO via openshift-install (no hub needed). acm-ztp = managed by an existing ACM hub via Zero-Touch Provisioning. capi = managed via Cluster API + Metal3 on an ACM 2.11+ hub."
+        },
+        "clusterRole": {
+          "title": "Cluster Role",
+          "x-group": "Basics",
+          "type": "string",
+          "enum": ["standalone", "hub", "managed"],
+          "default": "standalone",
+          "description": "What this cluster is for. standalone = a regular OpenShift cluster. hub = an ACM hub that will provision other clusters (adds ACM operator + Provisioning CR + AssistedServiceConfig manifests). managed = a cluster provisioned BY an existing ACM hub (renders provisioning CRs to apply on the hub)."
         }
       },
       "required": [

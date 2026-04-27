@@ -16,6 +16,10 @@ relatedTemplates:
   - acm-ztp.yaml.tpl
   - acm-asc.yaml.tpl
   - acm-creds.yaml.tpl
+bundle: capi
+clusterRole:
+  - managed
+bundleOrder: 1
 docs: https://github.com/openshift-assisted/cluster-api-provider-openshift-assisted
 -#}
 {#- openshift-machine-api.metal3.metal3-ironic, kubevirt-redfish.kubevirt-redfish - logs -#}

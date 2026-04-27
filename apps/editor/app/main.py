@@ -33,6 +33,14 @@ class RenderRequest(BaseModel):
     params: Optional[List[str]] = []
 
 
+class RenderBundleRequest(BaseModel):
+    """Request model for rendering a multi-file install-method bundle."""
+    yaml_text: str
+    bundle: str         # agent | acm-hub | acm-ztp | capi
+    cluster_role: str   # standalone | hub | managed
+    params: Optional[List[str]] = []
+
+
 # Content Security Policy for offline-first security
 # Note: 'unsafe-eval' required for AJV JSON Schema validation (uses new Function())
 CSP_HEADER = (
@@ -164,6 +172,50 @@ async def render(request: RenderRequest):
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
     return result
+
+
+@app.post("/api/render-bundle")
+async def render_bundle(request: RenderBundleRequest):
+    """
+    Render every template matching the requested install-method bundle and
+    cluster role, ordered by bundleOrder. Returns one file per matching
+    template so the editor can show them as tabs in the Templates view.
+    """
+    all_templates = list_templates(TEMPLATES_DIR)
+    matching = []
+    for t in all_templates:
+        bundles = [b.strip() for b in (t.get("bundle") or "").split(",") if b.strip()]
+        roles = t.get("clusterRole") or []
+        if request.bundle in bundles and request.cluster_role in roles:
+            matching.append(t)
+    matching.sort(key=lambda t: (t.get("bundleOrder", 99), t.get("filename", "")))
+
+    files = []
+    for t in matching:
+        result = render_template(
+            yaml_text=request.yaml_text,
+            template_name=t["filename"],
+            params=request.params or [],
+            templates_dir=TEMPLATES_DIR
+        )
+        files.append({
+            "filename": t["filename"],
+            "name": t.get("name") or t["filename"],
+            "description": t.get("description", ""),
+            "category": t.get("category", "other"),
+            "bundleOrder": t.get("bundleOrder", 99),
+            "success": result["success"],
+            "content": result.get("output", ""),
+            "warnings": result.get("warnings", []),
+            "error": result.get("error", "")
+        })
+
+    return {
+        "bundle": request.bundle,
+        "cluster_role": request.cluster_role,
+        "file_count": len(files),
+        "files": files
+    }
 
 
 # Mount static files

@@ -156,6 +156,9 @@ def parse_template_metadata(content: str) -> dict:
     category: installation|credentials|acm|configuration|utility|storage
     platforms: [list of supported platforms]
     requires: [list of required data fields]
+    bundle: agent | acm-hub | acm-ztp | capi | utility (or comma-separated list of bundles)
+    clusterRole: [standalone | hub | managed]  (which cluster intent this template serves)
+    bundleOrder: integer (display order in tabs; lower = leftmost)
     docs: URL to documentation
     -#}
     """
@@ -166,6 +169,9 @@ def parse_template_metadata(content: str) -> dict:
         "category": "other",
         "platforms": [],
         "requires": [],
+        "bundle": "",
+        "clusterRole": [],
+        "bundleOrder": 99,
         "docs": "",
         "yamlWrapper": "list"
     }
@@ -212,6 +218,9 @@ def list_templates(templates_dir: Path) -> list:
                 "category": "other",
                 "platforms": [],
                 "requires": [],
+                "bundle": "",
+                "clusterRole": [],
+                "bundleOrder": 99,
                 "docs": ""
             })
 
@@ -234,6 +243,9 @@ def list_templates(templates_dir: Path) -> list:
                 "category": "other",
                 "platforms": [],
                 "requires": [],
+                "bundle": "",
+                "clusterRole": [],
+                "bundleOrder": 99,
                 "docs": ""
             })
 

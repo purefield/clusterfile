@@ -14,6 +14,11 @@ relatedTemplates:
   - acm-clusterimageset.yaml.tpl
   - acm-ztp.yaml.tpl
   - acm-capi-m3.yaml.tpl
+bundle: acm-hub,acm-ztp
+clusterRole:
+  - hub
+  - managed
+bundleOrder: 4
 docs: https://docs.openshift.com/container-platform/4.20/installing/disconnected_install/index-disconnected.html
 -#}
 {%- set imageArch = cluster.arch | default("x86_64", true) | replace("-", "_") -%}

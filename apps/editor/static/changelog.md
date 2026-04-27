@@ -1,5 +1,12 @@
 # Clusterfile Editor Changelog
 
+## 3.22.22
+- **One Start modal, one CTA**: merged the welcome tour and new-document picker into a single Start modal. Captures topology (SNO/Compact/Full HA/Blank) and install method (Agent/ACM ZTP/CAPI) on one screen with inline explanations. Welcome sidebar item from 3.22.21 removed — the header **New** button is the single entry point.
+- **Cluster intent in the file**: clusterfiles now have `cluster.installMethod` and `cluster.clusterRole` so the editor knows which install bundle to render and which cluster role you're configuring. Set automatically when you pick from the Start modal.
+- **Tabbed install bundle in Rendered**: when an install method is set, the Rendered tab gains a thin row of file tabs — one per file in the install bundle (e.g. Agent shows install-config / agent-config / mirror-registry / creds / operators / pre-check). Click a tab to swap files in the same editor. A small footer reminds you that `<file:…>` placeholders are expanded by the CLI at render time.
+- **Smarter form hint**: replaces the static "ready to render" banner with a single state-aware next-step hint — amber when placeholders remain, red when validation errors remain, green when ready. Always one CTA, never two.
+- **Template metadata**: 15 templates declare which bundle and cluster role they belong to. The new `/api/render-bundle` endpoint uses this to render the right multi-file set without hardcoding.
+
 ## 3.22.21
 - **Welcome sidebar item**: moved the welcome-modal trigger from the header to a **Welcome** entry in the sidebar (right next to Guide). Click it to re-read the onboarding steps or pick a topology to start over.
 

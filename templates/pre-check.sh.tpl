@@ -15,6 +15,11 @@ relatedTemplates:
   - pre-check-ntp.sh.tpl
   - pre-check-registry.sh.tpl
   - pre-check-bmc.sh.tpl
+bundle: agent
+clusterRole:
+  - standalone
+  - hub
+bundleOrder: 9
 docs: https://docs.openshift.com/container-platform/latest/installing/installing_bare_metal/installing-bare-metal.html#installation-infrastructure-user-infra_installing-bare-metal
 -#}
 {%- include 'includes/pre-check/common.sh.tpl' %}

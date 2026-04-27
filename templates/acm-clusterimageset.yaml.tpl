@@ -13,6 +13,11 @@ relatedTemplates:
   - acm-ztp.yaml.tpl
   - acm-capi-m3.yaml.tpl
   - acm-asc.yaml.tpl
+bundle: acm-hub,acm-ztp,capi
+clusterRole:
+  - hub
+  - managed
+bundleOrder: 2
 docs: https://github.com/stolostron/acm-hive-openshift-releases
 -#}
 {%- set imageArch = cluster.arch | default("x86_64", true) | replace("-", "_") -%}

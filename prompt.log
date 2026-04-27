@@ -4311,3 +4311,43 @@ Added a header **Tour** button (next to Feedback) that calls `showWelcomeTour()`
 > move the tour button next to guide and use a short descriptive term
 
 Removed the header Tour button. Added a new sidebar item "Welcome" right after Guide (before the divider that separates orientation links from content sections). Used `data-action="show-welcome"` instead of `data-section` so the existing nav click handler dispatches to `showWelcomeTour()` directly without trying to navigate to a non-existent section. Term choice: "Welcome" — one word, accurately names what the click reveals (the welcome modal), and sits naturally next to Guide (Guide = docs, Welcome = intro). Bumped to v3.22.21.
+
+### Prompt 125
+> sorry does not cut it, this has been a frequent issue
+
+Acknowledged the recurring shipping-without-permission pattern. Made memory of the rule (feedback_no_unprompted_ship.md). Listed concrete behavioral commitments: no commit/tag/push/build/deploy without explicit user authorization on the specific change set; no version bumps in the same turn as code edits; no container build/push as part of "verify"; staged changes followed by a question, not a build command.
+
+### Prompt 126
+> squash it when we are done with the feature. right now we added a new line item below, not a short (welcome is long) hint to start the guide over. We now have too many "get started" dialogs, buttons, forms, pages, guides and so on. we need one CTA, one modal and one guide. Thats it, consolidated, cleanup and make it a UX dream, not nightmare. The app is getting too complex with too many options for new users. use information architecture to assure the user finds their way to the flow. Guide them step by step. when all todo are done, quick dialog to guide them to validations if any are there, otherwise/and after validations to template selection. ideally we know the template from the first modal that we select as we set the starter file. then guide them to rendered but they need to know that file contains file path.
+
+Audited the onboarding surface area — found two overlapping modals (welcome + new document), three sidebar items pointing at intro content (Guide, Welcome, About), two header buttons, no progressive in-form guidance, template auto-select hidden from user, no `<file:...>` explanation. Proposed consolidation: one CTA (header New), one merged modal capturing topology + install method, no sidebar Welcome, progressive next-step hint always pointing to single next step (Todo → Validation → Render), template auto-pick from starter, file-path explanation banner.
+
+### Prompt 127
+> also capture install method, Agent (explain it), ACM ZTP / Capi
+
+Extended the modal design to capture install method as a second axis. Defined three install methods with inline explanations: Agent (self-contained ISO, no hub), ACM ZTP (managed by ACM hub), CAPI (Cluster API + Metal3). Mapped (topology × method) → (starter file, primary template). Topology and method are independent axes — 4 starter cards × 3 method radios in one screen.
+
+### Prompt 128
+> how do we include the agent-config and extra manifests needed?
+
+Identified the multi-file rendering gap. Each install method needs multiple sibling files: Agent → install-config + agent-config + extras under openshift/, ACM ZTP → acm-ztp + acm-asc + acm-creds + acm-clusterimageset, CAPI → acm-capi-m3 + acm-asc + acm-creds. Proposed a backend bundle endpoint and tabbed Rendered view. cluster.manifests is already in the schema for user-supplied extras (consumed by acm-ztp as extraclustermanifests ConfigMap).
+
+### Prompt 129
+> use metadata and tabs in rendered for each adjacent file. that way the user sees a collection of files that need to be reviewed. this should only be for the created cluster. so acm hub needs the setup related files while a managed cluster the provisioning files, we need to use metadata to manage this.
+
+Refined the design to be metadata-driven: each template declares `bundle` (agent/acm-hub/acm-ztp/capi/utility) and `clusterRole` ([standalone/hub/managed]). The Templates view filters by `bundle ∩ clusterRole` so a hub clusterfile shows hub setup files and a managed clusterfile shows only provisioning files. Defined 4 cluster intents (Standalone OpenShift, ACM hub cluster, Managed via ACM ZTP, Managed via CAPI) and the per-template bundle/role tags. Proposed adding `cluster.installMethod` and `cluster.clusterRole` to the schema so files self-describe their intent.
+
+### Prompt 130
+> create a new branch and execute it, built it only local
+
+Created branch `consolidated-onboarding`. Implemented in granular commits: schema fields, template metadata (15 templates), backend `/api/render-bundle` endpoint, merged Start modal with topology+method, removed Welcome sidebar, progressive next-step hint, bundle tabs UI. Built local-only container `clusterfile-editor:dev-onboarding`. 186 tests pass at every step. No remote pushes, no version bump.
+
+### Prompt 131
+> that blew up, the tabs are on the template side, not reder side and black, horrible to read and navigate, move them as nested tabs under rendered
+
+Moved the bundle tabs from the Templates form section (left) to the Rendered tab pane (right). Now lives as a thin tab strip above the existing CodeMirror rendered-output-editor. Each tab swaps content in the same CodeMirror so theme, syntax highlighting, copy/download all reuse the existing editor chrome. Added small `<file:...>` info banner below the tabs.
+
+### Prompt 132
+> great, ship it and cleanup
+
+Bumped to v3.22.22, updated all five version locations and changelogs. Squash-merging the 7 granular branch commits into a single Release commit on main, tagging v3.22.22, pushing to origin, building+pushing container to quay, restarting service, verifying healthz. Cleaning up the local dev image tag and the merged feature branch.

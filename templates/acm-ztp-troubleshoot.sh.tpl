@@ -15,6 +15,11 @@ relatedTemplates:
   - acm-clusterimageset.yaml.tpl
   - acm-asc.yaml.tpl
   - acm-creds.yaml.tpl
+bundle: utility
+clusterRole:
+  - hub
+  - managed
+bundleOrder: 91
 docs: https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.11/html/clusters/cluster_mce_overview#ztp-intro
 -#}
 {%- set controlCount = hosts.values() | selectattr('role', 'equalto', 'control') | list | length -%}

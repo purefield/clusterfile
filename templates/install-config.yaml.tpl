@@ -27,6 +27,11 @@ relatedTemplates:
   - creds.yaml.tpl
   - mirror-registry-config.yaml.tpl
   - pre-check.sh.tpl
+bundle: agent
+clusterRole:
+  - standalone
+  - hub
+bundleOrder: 1
 docs: https://docs.openshift.com/container-platform/latest/installing/index.html
 yamlWrapper: raw
 -#}

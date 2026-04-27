@@ -81,14 +81,6 @@
             </svg>
             <span>Guide</span>
           </a>
-          <a class="sidebar-nav__item" data-action="show-welcome" title="Re-open the welcome modal — read the tour or pick a starter to start over">
-            <svg class="sidebar-nav__item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <circle cx="12" cy="12" r="10"/>
-              <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-              <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-            <span>Welcome</span>
-          </a>
 
           <div class="sidebar-nav__divider"></div>
 
@@ -237,14 +229,23 @@
             <div class="tab-content" data-tab-group="editor" data-tab="rendered">
               <div class="template-editor-pane">
                 <div class="template-editor-pane__header">
-                  <span>Rendered Output</span>
+                  <span id="rendered-output-title">Rendered Output</span>
                   <div>
                     <button class="btn btn--secondary btn--sm" id="copy-rendered-btn">Copy</button>
                     <button class="btn btn--secondary btn--sm" id="download-rendered-btn">Download</button>
                     <button class="btn btn--secondary btn--sm" id="preview-rendered-btn" style="display:none">Preview</button>
                   </div>
                 </div>
-                <div id="rendered-output-editor" style="height: calc(100% - 40px);"></div>
+                <div id="bundle-tabs-row" class="bundle-tabs" style="display:none;" role="tablist"></div>
+                <div id="bundle-info-row" class="bundle-info" style="display:none;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="14" height="14">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                  </svg>
+                  <span><code>&lt;file:…&gt;</code> placeholders are expanded by the CLI at render time. Mount your secrets directory or render via <code>process.py</code> for fully-expanded output.</span>
+                </div>
+                <div id="rendered-output-editor"></div>
               </div>
             </div>
           </div>

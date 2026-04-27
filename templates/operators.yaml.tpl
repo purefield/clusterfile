@@ -15,6 +15,12 @@ platforms:
   - none
 requires:
   - plugins.operators
+bundle: agent,acm-ztp,capi
+clusterRole:
+  - standalone
+  - hub
+  - managed
+bundleOrder: 6
 docs: https://docs.openshift.com/container-platform/latest/operators/admin/olm-adding-operators-to-cluster.html
 -#}
 {#- Standalone operator manifests for post-install: oc apply -f operators.yaml #}

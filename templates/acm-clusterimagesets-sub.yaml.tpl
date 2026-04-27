@@ -20,6 +20,10 @@ relatedTemplates:
   - acm-ztp.yaml.tpl
   - acm-capi-m3.yaml.tpl
   - acm-asc.yaml.tpl
+bundle: acm-hub
+clusterRole:
+  - hub
+bundleOrder: 3
 docs: https://github.com/stolostron/acm-hive-openshift-releases/tree/backplane-2.10/subscribe
 -#}
 {%- set operators = plugins.operators | default({}) -%}

@@ -15,6 +15,10 @@ relatedTemplates:
   - acm-capi-m3.yaml.tpl
   - acm-asc.yaml.tpl
   - acm-clusterimageset.yaml.tpl
+bundle: acm-ztp,capi
+clusterRole:
+  - managed
+bundleOrder: 2
 docs: https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.11/html/clusters/cluster_mce_overview
 -#}
 apiVersion: v1

@@ -109,6 +109,18 @@ function getTemplateIcon(category) {
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
   {
+    version: '3.22.22',
+    date: '2026-04-27',
+    changes: [
+      'Consolidated onboarding: single Start modal merges welcome+new picker, captures topology AND install method (Agent/ACM ZTP/CAPI) on one screen',
+      'New schema fields: cluster.installMethod and cluster.clusterRole — clusterfiles now self-describe their install intent',
+      '15 templates tagged with bundle/clusterRole/bundleOrder metadata; new /api/render-bundle endpoint resolves the right multi-file set',
+      'Tabbed install bundle in the Rendered pane — one tab per file, content swaps in the existing CodeMirror, <file:...> footer explains placeholder expansion',
+      'Progressive next-step hint replaces static banner — amber for placeholders, red for validation, green for ready; always one CTA',
+      'Removed the Welcome sidebar item from 3.22.21 — header New button is now the single CTA'
+    ]
+  },
+  {
     version: '3.22.21',
     date: '2026-04-27',
     changes: [
@@ -1312,11 +1324,8 @@ function setupNavigation() {
   navItems.forEach(item => {
     item.addEventListener('click', () => {
       const section = item.dataset.section;
-      const action = item.dataset.action;
       if (section) {
         navigateToSection(section);
-      } else if (action === 'show-welcome') {
-        showWelcomeTour();
       }
     });
 
@@ -1814,25 +1823,48 @@ function renderCurrentSection() {
 }
 
 /**
- * Inject a small banner at the top of a form section when the document
- * has zero placeholders and zero validation errors. Helps new users find
- * the Templates section once they're done filling out the form.
+ * Inject a single "next step" hint at the top of a form section. Content
+ * depends on document state — there is always exactly one CTA, never
+ * two competing ones.
+ *
+ *   Todo > 0                      → "X placeholders left — view Todo →"
+ *   Todo = 0, Validation > 0      → "All placeholders filled. Y validation issues to fix →"
+ *   Both 0                        → "Ready. Render <bundle> bundle →"
  */
 function renderReadyToRenderHint(container) {
   const todoCount = findPlaceholders(State.state.currentObject || {}).length;
   const validationCount = (State.state.validationErrors || []).length
     + (State.state.renderWarnings || []).length;
-  if (todoCount > 0 || validationCount > 0) return;
+  const installMethod = State.getNestedValue(State.state.currentObject, 'cluster.installMethod');
+
+  let hintClass, message, ctaLabel, ctaSection;
+  if (todoCount > 0) {
+    hintClass = 'next-step-hint next-step-hint--todo';
+    message   = `${todoCount} placeholder${todoCount === 1 ? '' : 's'} to replace before rendering.`;
+    ctaLabel  = 'View Todo →';
+    ctaSection = 'todo';
+  } else if (validationCount > 0) {
+    hintClass = 'next-step-hint next-step-hint--validation';
+    message   = `All placeholders filled. ${validationCount} validation issue${validationCount === 1 ? '' : 's'} to fix.`;
+    ctaLabel  = 'View Validation →';
+    ctaSection = 'validation';
+  } else {
+    hintClass = 'next-step-hint next-step-hint--ready';
+    const bundleLabel = installMethod ? `${installMethod} bundle` : 'a template';
+    message   = `Ready. Render ${bundleLabel}.`;
+    ctaLabel  = 'Open Templates →';
+    ctaSection = 'templates';
+  }
 
   const hint = document.createElement('div');
-  hint.className = 'ready-to-render-hint';
+  hint.className = hintClass;
   hint.innerHTML = `
-    <span>Configuration looks complete — no placeholders, no validation errors.</span>
-    <button class="btn btn--primary" id="ready-render-btn">Render a template →</button>
+    <span>${Help.escapeHtml(message)}</span>
+    <button class="btn btn--primary" id="next-step-btn">${Help.escapeHtml(ctaLabel)}</button>
   `;
   container.insertBefore(hint, container.firstChild);
-  document.getElementById('ready-render-btn')?.addEventListener('click', () => {
-    navigateToSection('templates');
+  document.getElementById('next-step-btn')?.addEventListener('click', () => {
+    navigateToSection(ctaSection);
   });
 }
 
@@ -1894,6 +1926,13 @@ function renderTemplatesSection(container) {
     }
   });
 
+  // The install bundle (if cluster.installMethod is set) is rendered as
+  // nested tabs inside the Rendered tab on the right pane — see
+  // renderInstallBundleTabs(). The Templates form section here keeps the
+  // single-template select for utility templates and power users.
+  const installMethod = State.getNestedValue(State.state.currentObject, 'cluster.installMethod');
+  const clusterRole   = State.getNestedValue(State.state.currentObject, 'cluster.clusterRole') || 'standalone';
+
   container.innerHTML = `
     <div class="template-panel">
       <div class="form-section">
@@ -1954,6 +1993,13 @@ function renderTemplatesSection(container) {
       </div>
     </div>
   `;
+
+  // Render the install bundle as nested tabs inside the Rendered tab pane.
+  if (installMethod) {
+    renderInstallBundleTabs(installMethod, clusterRole);
+  } else {
+    clearInstallBundleTabs();
+  }
 
   // Set up change platform link
   document.getElementById('change-platform-link')?.addEventListener('click', (e) => {
@@ -2155,6 +2201,95 @@ async function selectPlatform(platform) {
   }
 
   showToast(`Platform set to ${PLATFORM_INFO[platform]?.name || platform}`, 'success');
+}
+
+/**
+ * Hide the bundle tabs row and info banner inside the Rendered tab pane.
+ * Called when the clusterfile has no installMethod (single-template flow).
+ */
+function clearInstallBundleTabs() {
+  const tabsRow = document.getElementById('bundle-tabs-row');
+  const infoRow = document.getElementById('bundle-info-row');
+  if (tabsRow) { tabsRow.style.display = 'none'; tabsRow.innerHTML = ''; }
+  if (infoRow) { infoRow.style.display = 'none'; }
+  const titleEl = document.getElementById('rendered-output-title');
+  if (titleEl) titleEl.textContent = 'Rendered Output';
+}
+
+/**
+ * Render the install-method bundle. Populates the tabs row at the top of
+ * the Rendered tab pane and routes each tab's content into the existing
+ * CodeMirror rendered-output-editor (so it inherits the editor theme,
+ * syntax highlighting, line numbers — same chrome as single-template).
+ */
+async function renderInstallBundleTabs(bundle, role) {
+  const tabsRow = document.getElementById('bundle-tabs-row');
+  const infoRow = document.getElementById('bundle-info-row');
+  const titleEl = document.getElementById('rendered-output-title');
+  if (!tabsRow || !infoRow) return;
+
+  // Show the row immediately with a placeholder so the user knows we're working
+  tabsRow.style.display = 'flex';
+  tabsRow.innerHTML = `<span class="bundle-tab" style="cursor:default;font-style:italic;">Rendering ${Help.escapeHtml(bundle)} bundle…</span>`;
+  if (titleEl) titleEl.textContent = `Bundle: ${bundle} (${role})`;
+
+  if (isStandaloneMode) {
+    tabsRow.innerHTML = `<span class="bundle-tab" style="cursor:default;color:var(--pf-global--danger-color--100,#c9190b);">Bundle rendering requires the container backend</span>`;
+    return;
+  }
+
+  let result;
+  try {
+    const resp = await fetch(`${API_BASE}/api/render-bundle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        yaml_text: State.state.currentYamlText || '',
+        bundle: bundle,
+        cluster_role: role,
+        params: []
+      })
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    result = await resp.json();
+  } catch (e) {
+    tabsRow.innerHTML = `<span class="bundle-tab is-error" style="cursor:default;">Bundle render failed: ${Help.escapeHtml(e.message)}</span>`;
+    return;
+  }
+
+  const files = result.files || [];
+  if (!files.length) {
+    tabsRow.innerHTML = `<span class="bundle-tab" style="cursor:default;">No templates match ${Help.escapeHtml(bundle)} / ${Help.escapeHtml(role)} — change install method via New.</span>`;
+    return;
+  }
+
+  // Build the tab buttons
+  tabsRow.innerHTML = files.map((f, i) => `
+    <button class="bundle-tab${i === 0 ? ' is-active' : ''}${f.success ? '' : ' is-error'}"
+            role="tab"
+            data-tab-index="${i}"
+            title="${Help.escapeHtml(f.description || '')}">
+      ${Help.escapeHtml(f.name)}${f.success ? '' : ' ⚠'}
+    </button>
+  `).join('');
+  infoRow.style.display = 'flex';
+
+  const showTab = (i) => {
+    const f = files[i];
+    const content = f.success
+      ? (f.content || '# (empty render)')
+      : `# Render failed for ${f.filename}\n# ${f.error || '(no error message)'}`;
+    CodeMirror.setRenderedValue(content);
+    if (titleEl) titleEl.textContent = `Bundle: ${bundle} (${role}) — ${f.name}`;
+    tabsRow.querySelectorAll('.bundle-tab').forEach((t, ti) => {
+      t.classList.toggle('is-active', ti === i);
+    });
+  };
+  showTab(0);
+
+  tabsRow.querySelectorAll('.bundle-tab').forEach(tab => {
+    tab.addEventListener('click', () => showTab(parseInt(tab.dataset.tabIndex, 10)));
+  });
 }
 
 /**
@@ -3313,139 +3448,157 @@ function populateTemplatesDropdown() {
 /**
  * Show new document modal with starter file choices
  */
-function showNewDocumentModal() {
-  const STARTERS = [
-    { filename: 'start-sno.clusterfile', label: 'Single Node (SNO)', desc: '1 server — all roles, no HA. Good for edge or lab.' },
-    { filename: 'start-compact.clusterfile', label: 'Compact (3-node)', desc: '3 servers — control-plane with etcd HA, no workers.' },
-    { filename: 'start-full.clusterfile', label: 'Full HA', desc: '3 control + N worker servers — production topology.' },
-  ];
+// Topology + install method choices for the Start modal.
+// Each install method maps to a bundle name (matches template metadata).
+const TOPOLOGIES = [
+  { id: 'sno',     filename: 'start-sno.clusterfile',     label: 'SNO',           desc: '1 server, no HA — edge or lab' },
+  { id: 'compact', filename: 'start-compact.clusterfile', label: 'Compact',       desc: '3 nodes, etcd HA, no workers' },
+  { id: 'full',    filename: 'start-full.clusterfile',    label: 'Full HA',       desc: '3 control + N worker — production' },
+  { id: 'blank',   filename: '',                          label: 'Blank',         desc: 'Empty document' },
+];
+const INSTALL_METHODS = [
+  { id: 'agent',   bundle: 'agent',   role: 'standalone',
+    label: 'Agent-based installer',
+    desc: 'Self-contained ISO. openshift-install builds an ISO; you boot each server from it. No hub cluster needed.' },
+  { id: 'acm-ztp', bundle: 'acm-ztp', role: 'managed',
+    label: 'ACM ZTP (Zero-Touch Provisioning)',
+    desc: 'Apply manifests to an existing ACM hub. Hub boots and provisions the managed cluster via BMC virtual media.' },
+  { id: 'capi',    bundle: 'capi',    role: 'managed',
+    label: 'CAPI (Cluster API + Metal3)',
+    desc: 'Declarative Cluster API provisioning via Metal3. Hub-driven, K8s-native. Requires ACM 2.11+.' },
+];
+
+/**
+ * Single Start modal — merges the welcome tour and new-document picker.
+ * Captures topology and install method together; loads the starter and
+ * sets State.installMethod / clusterRole so the Templates view renders
+ * the right multi-file bundle.
+ */
+function showStartModal() {
+  const lastTopology = State.state.lastTopology || 'sno';
+  const lastMethod   = State.state.lastInstallMethod || 'agent';
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
-    <div class="modal">
+    <div class="modal modal--start">
       <div class="modal__header">
-        <h2 class="modal__title">New Clusterfile</h2>
+        <h2 class="modal__title">Start a new cluster</h2>
         <span class="modal__close">×</span>
       </div>
       <div class="modal__body">
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          ${STARTERS.map(s => `
-            <button class="btn btn--secondary starter-choice" data-filename="${s.filename}" style="text-align:left;padding:10px 14px;">
-              <strong>${s.label}</strong>
-              <span style="margin-left:8px;opacity:0.65;font-size:0.85em;">${s.desc}</span>
-            </button>`).join('')}
-          <button class="btn btn--secondary starter-choice" data-filename="" style="text-align:left;padding:10px 14px;margin-top:4px;opacity:0.7;">
-            <strong>Blank</strong>
-            <span style="margin-left:8px;opacity:0.65;font-size:0.85em;">Empty document</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  `;
-
-  document.body.appendChild(overlay);
-
-  const closeModal = () => overlay.remove();
-
-  overlay.querySelector('.modal__close').addEventListener('click', closeModal);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
-
-  overlay.querySelectorAll('.starter-choice').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      closeModal();
-      try {
-        await loadStarter(btn.dataset.filename);
-      } catch (e) {
-        showToast(`Error: ${e.message}`, 'error');
-      }
-    });
-  });
-}
-
-function showWelcomeTour() {
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay';
-  overlay.innerHTML = `
-    <div class="modal">
-      <div class="modal__header">
-        <h2 class="modal__title">Welcome to Clusterfile Editor</h2>
-        <span class="modal__close">×</span>
-      </div>
-      <div class="modal__body">
-        <div class="tour-step">
-          <span class="tour-step__number">1</span>
-          <div class="tour-step__title">You're looking at a starter SNO cluster</div>
-          <div class="tour-step__description">
-            Replace the <code>&lt;placeholder&gt;</code> values in the form (or YAML pane) with your real cluster name, network, BMC details, etc. Want a different topology? Pick one below.
+        <div class="start-modal__section">
+          <div class="start-modal__heading">1. Topology</div>
+          <div class="start-modal__topology-grid">
+            ${TOPOLOGIES.map(t => `
+              <label class="start-modal__topology-card${t.id === lastTopology ? ' is-selected' : ''}">
+                <input type="radio" name="topology" value="${t.id}" ${t.id === lastTopology ? 'checked' : ''} hidden>
+                <div class="start-modal__topology-label">${Help.escapeHtml(t.label)}</div>
+                <div class="start-modal__topology-desc">${Help.escapeHtml(t.desc)}</div>
+              </label>
+            `).join('')}
           </div>
         </div>
-        <div class="tour-step">
-          <span class="tour-step__number">2</span>
-          <div class="tour-step__title">Account → Cluster → Network → Hosts</div>
-          <div class="tour-step__description">
-            Use the sidebar to walk the sections. The <strong>Todo</strong> badge counts unfilled <code>&lt;placeholder&gt;</code> values; <strong>Validation</strong> shows schema errors. Drive both to 0.
+
+        <div class="start-modal__section">
+          <div class="start-modal__heading">2. Install method</div>
+          <div class="start-modal__methods">
+            ${INSTALL_METHODS.map(m => `
+              <label class="start-modal__method${m.id === lastMethod ? ' is-selected' : ''}">
+                <input type="radio" name="install-method" value="${m.id}" ${m.id === lastMethod ? 'checked' : ''}>
+                <div>
+                  <div class="start-modal__method-label">${Help.escapeHtml(m.label)}</div>
+                  <div class="start-modal__method-desc">${Help.escapeHtml(m.desc)}</div>
+                </div>
+              </label>
+            `).join('')}
           </div>
         </div>
-        <div class="tour-step">
-          <span class="tour-step__number">3</span>
-          <div class="tour-step__title">Stuck on a field?</div>
-          <div class="tour-step__description">
-            Click the <strong>?</strong> next to any field for help text and a doc link. The full <strong>Guide</strong> in the sidebar covers end-to-end deployment.
-          </div>
-        </div>
-        <div class="tour-step">
-          <span class="tour-step__number">4</span>
-          <div class="tour-step__title">Done editing?</div>
-          <div class="tour-step__description">
-            Open <strong>Templates</strong>, choose a template (e.g. <code>acm-ztp</code> for ACM-managed baremetal, <code>install-config</code> for openshift-install), render, and apply.
-          </div>
-        </div>
-        <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--pf-global--BorderColor--100, #444);">
-          <div style="font-size:0.85em;opacity:0.75;margin-bottom:6px;">Start with a different topology:</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button class="btn btn--secondary tour-starter" data-filename="start-sno.clusterfile" title="1 server — all roles, no HA">SNO</button>
-            <button class="btn btn--secondary tour-starter" data-filename="start-compact.clusterfile" title="3 servers — control-plane only, etcd HA, no workers">Compact (3-node)</button>
-            <button class="btn btn--secondary tour-starter" data-filename="start-full.clusterfile" title="3 control + N worker — production">Full HA</button>
-            <button class="btn btn--secondary tour-starter" data-filename="" title="Empty document">Blank</button>
-          </div>
+
+        <div class="start-modal__section start-modal__how">
+          <div class="start-modal__heading">How it works</div>
+          <ol class="start-modal__steps">
+            <li>Replace the <code>&lt;placeholder&gt;</code> values in the form.</li>
+            <li>Drive the <strong>Todo</strong> and <strong>Validation</strong> badges to 0.</li>
+            <li>Open <strong>Templates</strong> — your install bundle is pre-rendered as tabs.</li>
+            <li>Apply with <code>oc apply</code> (CLI expands <code>&lt;file:…&gt;</code> paths at render time).</li>
+          </ol>
         </div>
       </div>
       <div class="modal__footer">
         <label style="flex: 1; display: flex; align-items: center; gap: 8px;">
-          <input type="checkbox" id="tour-dont-show">
-          Don't show again
+          <input type="checkbox" id="start-dont-show">
+          Don't show on first visit
         </label>
-        <button class="btn btn--primary" id="tour-close">Get Started</button>
+        <button class="btn btn--secondary" id="start-cancel">Cancel</button>
+        <button class="btn btn--primary" id="start-go">Start →</button>
       </div>
     </div>
   `;
 
   document.body.appendChild(overlay);
 
+  // Visual selection state for cards/methods
+  overlay.querySelectorAll('input[name="topology"]').forEach(input => {
+    input.addEventListener('change', () => {
+      overlay.querySelectorAll('.start-modal__topology-card').forEach(c => c.classList.remove('is-selected'));
+      input.closest('.start-modal__topology-card')?.classList.add('is-selected');
+    });
+  });
+  overlay.querySelectorAll('input[name="install-method"]').forEach(input => {
+    input.addEventListener('change', () => {
+      overlay.querySelectorAll('.start-modal__method').forEach(c => c.classList.remove('is-selected'));
+      input.closest('.start-modal__method')?.classList.add('is-selected');
+    });
+  });
+
   const closeModal = () => {
-    if (document.getElementById('tour-dont-show')?.checked) {
+    if (document.getElementById('start-dont-show')?.checked) {
       State.setTourShown();
     }
     overlay.remove();
   };
 
   overlay.querySelector('.modal__close').addEventListener('click', closeModal);
-  overlay.querySelector('#tour-close').addEventListener('click', closeModal);
-  overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) closeModal();
-  });
-  overlay.querySelectorAll('.tour-starter').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      try {
-        await loadStarter(btn.dataset.filename);
-      } catch (e) {
-        showToast(`Error: ${e.message}`, 'error');
+  overlay.querySelector('#start-cancel').addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+
+  overlay.querySelector('#start-go').addEventListener('click', async () => {
+    const topologyId = overlay.querySelector('input[name="topology"]:checked')?.value || 'sno';
+    const methodId   = overlay.querySelector('input[name="install-method"]:checked')?.value || 'agent';
+    const topology = TOPOLOGIES.find(t => t.id === topologyId) || TOPOLOGIES[0];
+    const method   = INSTALL_METHODS.find(m => m.id === methodId) || INSTALL_METHODS[0];
+
+    State.state.lastTopology = topologyId;
+    State.state.lastInstallMethod = methodId;
+    State.state.installMethod = method.bundle;
+    State.state.clusterRole   = method.role;
+
+    closeModal();
+    try {
+      await loadStarter(topology.filename);
+      // Stamp the choice into the clusterfile so it persists across reloads
+      // and so the Templates view knows which bundle to render.
+      if (State.state.currentObject) {
+        if (!State.state.currentObject.cluster) State.state.currentObject.cluster = {};
+        State.state.currentObject.cluster.installMethod = method.bundle;
+        State.state.currentObject.cluster.clusterRole   = method.role;
+        const yaml = State.toYaml();
+        State.state.currentYamlText = yaml;
+        CodeMirror.setEditorValue(yaml, false);
+        renderCurrentSection();
       }
-      closeModal();
-    });
+    } catch (e) {
+      showToast(`Error: ${e.message}`, 'error');
+    }
   });
 }
+
+// Backwards-compatible aliases for the merged Start modal.
+// Kept so existing call sites (header New button, sidebar Welcome) keep
+// working without renaming. Prefer `showStartModal()` in new code.
+const showNewDocumentModal = showStartModal;
+const showWelcomeTour      = showStartModal;
 
 /**
  * Update version display in header

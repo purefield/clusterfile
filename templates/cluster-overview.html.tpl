@@ -19,6 +19,12 @@ requires:
 relatedTemplates:
   - install-config.yaml.tpl
   - pre-check.sh.tpl
+bundle: utility
+clusterRole:
+  - standalone
+  - hub
+  - managed
+bundleOrder: 90
 docs: https://docs.openshift.com/container-platform/latest/installing/index.html
 -#}
 {%- set controlHosts = hosts.values() | selectattr('role', 'in', ['control', 'master']) | list -%}

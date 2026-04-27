@@ -12,6 +12,10 @@ relatedTemplates:
   - acm-capi-m3.yaml.tpl
   - acm-creds.yaml.tpl
   - acm-clusterimageset.yaml.tpl
+bundle: acm-hub
+clusterRole:
+  - hub
+bundleOrder: 1
 docs: https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.11/html/clusters/cluster_mce_overview#enable-cim
 -#}
 {%- set imageArch = cluster.arch | default("x86_64", true) -%}

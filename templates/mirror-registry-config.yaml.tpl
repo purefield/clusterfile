@@ -5,6 +5,11 @@ type: clusterfile
 category: configuration
 requires:
   - cluster.mirrors
+bundle: agent
+clusterRole:
+  - standalone
+  - hub
+bundleOrder: 4
 docs: https://docs.openshift.com/container-platform/latest/installing/disconnected_install/installing-mirroring-disconnected.html
 -#}
 {%- set sources %}{% include "includes/imageContentSource.yaml.tpl" %}{% endset -%}
