@@ -109,6 +109,13 @@ function getTemplateIcon(category) {
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
   {
+    version: '3.22.21',
+    date: '2026-04-27',
+    changes: [
+      'Moved the welcome-modal trigger from the header to a Welcome sidebar item next to Guide — same behavior, better placement'
+    ]
+  },
+  {
     version: '3.22.20',
     date: '2026-04-27',
     changes: [
@@ -1305,8 +1312,11 @@ function setupNavigation() {
   navItems.forEach(item => {
     item.addEventListener('click', () => {
       const section = item.dataset.section;
+      const action = item.dataset.action;
       if (section) {
         navigateToSection(section);
+      } else if (action === 'show-welcome') {
+        showWelcomeTour();
       }
     });
 
@@ -1603,9 +1613,6 @@ function setupHeaderActions() {
 
   // Preview overview button
   document.getElementById('btn-preview-overview')?.addEventListener('click', previewClusterOverview);
-
-  // Tour button — re-show welcome modal at any time
-  document.getElementById('btn-tour')?.addEventListener('click', showWelcomeTour);
 
   // Feedback button
   document.getElementById('btn-feedback')?.addEventListener('click', openFeedback);

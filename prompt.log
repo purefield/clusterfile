@@ -4306,3 +4306,8 @@ Provided three ways to surface the welcome modal: open in private/incognito wind
 > Add option to trigger guided (start over)
 
 Added a header **Tour** button (next to Feedback) that calls `showWelcomeTour()` directly. Modal text/buttons unchanged — closing without picking a topology preserves current document; picking a topology (SNO/Compact/Full/Blank) loads that starter and replaces current document. Bumped to v3.22.20, updated all changelog locations.
+
+### Prompt 124
+> move the tour button next to guide and use a short descriptive term
+
+Removed the header Tour button. Added a new sidebar item "Welcome" right after Guide (before the divider that separates orientation links from content sections). Used `data-action="show-welcome"` instead of `data-section` so the existing nav click handler dispatches to `showWelcomeTour()` directly without trying to navigate to a non-existent section. Term choice: "Welcome" — one word, accurately names what the click reveals (the welcome modal), and sits naturally next to Guide (Guide = docs, Welcome = intro). Bumped to v3.22.21.

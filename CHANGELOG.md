@@ -5,6 +5,9 @@ All notable changes to this project are documented in this file.
 ## Unreleased
 - Tooling: `scripts/extract-doc-urls.py` walks all schemas and emits `schema/x-doc-urls.csv` (115 rows × 6 columns); `scripts/import-doc-urls.py` reads the CSV and applies non-empty `new_url` values back into the source schema files (with `--dry-run` and JSON validation). Sets up the docs.redhat.com html-single URL rewrite — fill `new_url` column then re-import.
 
+## v3.22.21 (2026-04-27)
+- Editor: moved the welcome-modal trigger from the header to a **Welcome** sidebar item next to Guide. Same behavior — read the onboarding steps or pick a topology to start over — but now lives where users look for orientation.
+
 ## v3.22.20 (2026-04-27)
 - Editor: header now has a **Tour** button that re-opens the welcome modal at any time. Use it to re-read the onboarding steps, or to "start over" by clicking a topology button (SNO / Compact / Full HA / Blank) which swaps the current document for the chosen starter.
 

@@ -1,5 +1,8 @@
 # Clusterfile Editor Changelog
 
+## 3.22.21
+- **Welcome sidebar item**: moved the welcome-modal trigger from the header to a **Welcome** entry in the sidebar (right next to Guide). Click it to re-read the onboarding steps or pick a topology to start over.
+
 ## 3.22.20
 - **Tour button in header**: opens the welcome modal at any time. Read the onboarding steps again, or click a topology button (SNO / Compact / Full HA / Blank) to swap the current document for that starter — i.e. "start over" in one click.
 
