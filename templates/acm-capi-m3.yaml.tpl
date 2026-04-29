@@ -151,7 +151,7 @@ items:
     namespace: {{ cluster.name }}
   spec:
     controlPlaneEndpoint:
-      host: {{ cluster.name }}.{{ network.domain }}
+      host: api.{{ cluster.name }}.{{ network.domain }}
       port: 6443
     noCloudProvider: true
 - kind: Metal3MachineTemplate
