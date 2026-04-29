@@ -314,9 +314,37 @@ The Clusterfile Editor is a browser-based UI for editing clusterfiles with schem
 ### Run from container
 
 ```bash
+# Minimal — `<file:…>` references render as path placeholders.
 podman run -d --name clusterfile-editor -p 8000:8000 quay.io/dds/clusterfile-editor:latest
 # Open http://localhost:8000
 ```
+
+### Mounting your include content (optional)
+
+Templates use `load_file()` to inline pull secrets, SSH keys, certs, BMC
+passwords, extra manifests — anything referenced by an `x-is-file` schema
+field. The container can substitute those references for you at render time.
+
+Mount the directory whose layout matches the paths in your clusterfile at
+`/content` (read-only) and flip the **File: path | content** rocker in the
+Rendered pane to show real bytes. With no mount, every reference renders as
+its `<file:…>` placeholder, exactly the form `process.py` (CLI) accepts.
+
+```bash
+# Layout under /content mirrors the paths your clusterfile uses, e.g.:
+#   /path/to/your/content/secrets/pull-secret.json
+#   /path/to/your/content/secrets/id_rsa.pub
+#   /path/to/your/content/manifests/extra-machineconfig.yaml
+#   /path/to/your/content/certs/internal-ca.crt
+podman run -d --name clusterfile-editor -p 8000:8000 \
+  -v /path/to/your/content:/content:ro,Z \
+  quay.io/dds/clusterfile-editor:latest
+```
+
+The editor never persists or returns content via the inventory endpoint — it
+lists relative paths only and reads file bytes only when you explicitly opt
+in via the rocker (per-render `include_content=true`). Path-traversal
+escapes (`../`) are blocked.
 
 ### Build from source
 

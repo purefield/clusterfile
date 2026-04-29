@@ -13,7 +13,7 @@ from typing import List, Optional
 import json
 import os
 
-from app.template_processor import render_template, list_templates, get_template_content
+from app.template_processor import render_template, list_templates, get_template_content, content_status
 
 # Read version from APP_VERSION file
 VERSION_FILE = Path(__file__).resolve().parent.parent / "APP_VERSION"
@@ -31,6 +31,7 @@ class RenderRequest(BaseModel):
     yaml_text: str
     template_name: str
     params: Optional[List[str]] = []
+    include_content: bool = False
 
 
 class RenderBundleRequest(BaseModel):
@@ -39,6 +40,7 @@ class RenderBundleRequest(BaseModel):
     bundle: str         # agent | acm-hub | acm-ztp | capi
     cluster_role: str   # standalone | hub | managed
     params: Optional[List[str]] = []
+    include_content: bool = False
 
 
 # Content Security Policy for offline-first security
@@ -151,6 +153,19 @@ async def get_templates():
     return {"templates": templates}
 
 
+@app.get("/api/content-status")
+async def get_content_status():
+    """Report whether the content mount is present and what files it holds.
+
+    Returns relative paths under the mount so the UI can show an inventory
+    matching the form template ``load_file()`` calls use (e.g.
+    ``secrets/pull-secret.json``, ``manifests/extra.yaml``). Never returns
+    file contents — those only travel via ``/api/render(-bundle)`` when
+    ``include_content=true``.
+    """
+    return content_status()
+
+
 @app.get("/api/templates/{template_name}")
 async def get_template(template_name: str):
     """Get the content of a specific template."""
@@ -167,7 +182,8 @@ async def render(request: RenderRequest):
         yaml_text=request.yaml_text,
         template_name=request.template_name,
         params=request.params or [],
-        templates_dir=TEMPLATES_DIR
+        templates_dir=TEMPLATES_DIR,
+        include_content=request.include_content
     )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -196,7 +212,8 @@ async def render_bundle(request: RenderBundleRequest):
             yaml_text=request.yaml_text,
             template_name=t["filename"],
             params=request.params or [],
-            templates_dir=TEMPLATES_DIR
+            templates_dir=TEMPLATES_DIR,
+            include_content=request.include_content
         )
         files.append({
             "filename": t["filename"],

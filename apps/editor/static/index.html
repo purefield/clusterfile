@@ -230,7 +230,14 @@
               <div class="template-editor-pane">
                 <div class="template-editor-pane__header">
                   <span id="rendered-output-title">Rendered Output</span>
-                  <div>
+                  <div class="rendered-actions">
+                    <span class="rocker-label">File:</span>
+                    <div id="secrets-toggle" class="rocker is-disabled" role="switch" aria-checked="false" tabindex="0"
+                         title="Switch how `<file:…>` references render: as the path placeholder or as the substituted file content from the mounted secrets directory.">
+                      <span class="rocker__opt is-active" data-mode="path">path</span>
+                      <span class="rocker__opt" data-mode="content">content</span>
+                      <span class="rocker__thumb" aria-hidden="true"></span>
+                    </div>
                     <button class="btn btn--secondary btn--sm" id="copy-rendered-btn">Copy</button>
                     <button class="btn btn--secondary btn--sm" id="download-rendered-btn">Download</button>
                     <button class="btn btn--secondary btn--sm" id="preview-rendered-btn" style="display:none">Preview</button>
@@ -243,7 +250,7 @@
                     <line x1="12" y1="16" x2="12" y2="12"/>
                     <line x1="12" y1="8" x2="12.01" y2="8"/>
                   </svg>
-                  <span><code>&lt;file:…&gt;</code> placeholders are expanded by the CLI at render time. Mount your secrets directory or render via <code>process.py</code> for fully-expanded output.</span>
+                  <span id="bundle-info-text"><code>&lt;file:…&gt;</code> placeholders are expanded by the CLI at render time. Mount your secrets directory or render via <code>process.py</code> for fully-expanded output.</span>
                 </div>
                 <div id="rendered-output-editor"></div>
               </div>

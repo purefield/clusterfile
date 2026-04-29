@@ -1,5 +1,11 @@
 # Clusterfile Editor Changelog
 
+## 3.23.0
+- **Mount your content directory and render real files**: container now honors a `/content` mount that resolves *any* `load_file()` reference — not just secrets. Lay out subdirs the way your clusterfile references them (`secrets/`, `manifests/`, `certs/`, …) and run with `-v /path/to/your/content:/content:ro,Z`. With no mount, the editor keeps rendering `<file:…>` placeholders exactly like before. Path-traversal escapes are blocked.
+- **"File: path | content" rocker** in the Rendered pane next to Copy/Download. Both options are always visible — you can see the alternative without clicking. Greyed out with a tooltip when `/content` isn't mounted.
+- **Start modal no longer shows phantom edits**: picking a topology + install method now re-baselines the document, so the Changes count and modified-indicator stay at zero on a fresh start.
+- **Preview crash fixed**: cluster-overview no longer errors with "list object has no element 1" when subnet fields still hold `<subnet-cidr>` placeholders from an unedited starter.
+
 ## 3.22.22
 - **One Start modal, one CTA**: merged the welcome tour and new-document picker into a single Start modal. Captures topology (SNO/Compact/Full HA/Blank) and install method (Agent/ACM ZTP/CAPI) on one screen with inline explanations. Welcome sidebar item from 3.22.21 removed — the header **New** button is the single entry point.
 - **Cluster intent in the file**: clusterfiles now have `cluster.installMethod` and `cluster.clusterRole` so the editor knows which install bundle to render and which cluster role you're configuring. Set automatically when you pick from the Start modal.

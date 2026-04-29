@@ -292,9 +292,10 @@ docs: https://docs.openshift.com/container-platform/latest/installing/index.html
 <section>
   <h2>Network</h2>{% if network.primary is defined %}
   <h3>Primary</h3>
-  <table class="kv">{% if network.primary.subnet is defined %}
+  <table class="kv">{% if network.primary.subnet is defined and '/' in network.primary.subnet %}
     {%- set primaryPrefix = network.primary.subnet.split('/')[1] | int -%}
-    <tr><td>Machine Network</td><td>{{ network.primary.subnet }} <span style="color:var(--muted)">({{ 2 ** (32 - primaryPrefix) - 2 }} hosts)</span></td></tr>{% endif %}{% if network.primary.gateway is defined %}
+    <tr><td>Machine Network</td><td>{{ network.primary.subnet }} <span style="color:var(--muted)">({{ 2 ** (32 - primaryPrefix) - 2 }} hosts)</span></td></tr>{% elif network.primary.subnet is defined %}
+    <tr><td>Machine Network</td><td>{{ network.primary.subnet }}</td></tr>{% endif %}{% if network.primary.gateway is defined %}
     <tr><td>Gateway</td><td>{{ network.primary.gateway }}</td></tr>{% endif %}
     <tr><td>Network Type</td><td>{{ network.primary.type | default('OVNKubernetes') }}</td></tr>{% if network.primary.mtu %}
     <tr><td>MTU</td><td>{{ network.primary.mtu }}</td></tr>{% endif %}{% if network.primary.bond %}
@@ -304,16 +305,19 @@ docs: https://docs.openshift.com/container-platform/latest/installing/index.html
   <h3>Cluster Networks</h3>
   <table>
     <thead><tr><th>Network</th><th>CIDR</th><th>Capacity</th></tr></thead>
-    <tbody>{% if network.cluster.subnet is defined %}
+    <tbody>{% if network.cluster.subnet is defined and '/' in network.cluster.subnet %}
       {%- set clusterPrefix = network.cluster.subnet.split('/')[1] | int -%}
       {%- set hostPrefix = network.cluster.hostPrefix | default(23) | int -%}
       {%- set podsPerNode = 2 ** (32 - hostPrefix) -%}
       {%- set maxNodes = 2 ** (hostPrefix - clusterPrefix) -%}
-      <tr><td>Cluster (pods)</td><td><code>{{ network.cluster.subnet }}</code></td><td>{{ podsPerNode }} pods/node at /{{ hostPrefix }} ({{ maxNodes }} max nodes)</td></tr>{% endif %}{% if network.service is defined and network.service.subnet is defined %}
+      <tr><td>Cluster (pods)</td><td><code>{{ network.cluster.subnet }}</code></td><td>{{ podsPerNode }} pods/node at /{{ hostPrefix }} ({{ maxNodes }} max nodes)</td></tr>{% elif network.cluster.subnet is defined %}
+      <tr><td>Cluster (pods)</td><td><code>{{ network.cluster.subnet }}</code></td><td>—</td></tr>{% endif %}{% if network.service is defined and network.service.subnet is defined and '/' in network.service.subnet %}
       {%- set svcPrefix = network.service.subnet.split('/')[1] | int -%}
-      <tr><td>Service</td><td><code>{{ network.service.subnet }}</code></td><td>{{ 2 ** (32 - svcPrefix) - 2 }} addresses</td></tr>{% endif %}{% if network.primary is defined and network.primary.subnet is defined %}
+      <tr><td>Service</td><td><code>{{ network.service.subnet }}</code></td><td>{{ 2 ** (32 - svcPrefix) - 2 }} addresses</td></tr>{% elif network.service is defined and network.service.subnet is defined %}
+      <tr><td>Service</td><td><code>{{ network.service.subnet }}</code></td><td>—</td></tr>{% endif %}{% if network.primary is defined and network.primary.subnet is defined and '/' in network.primary.subnet %}
       {%- set machinePrefix = network.primary.subnet.split('/')[1] | int -%}
-      <tr><td>Machine</td><td><code>{{ network.primary.subnet }}</code></td><td>{{ 2 ** (32 - machinePrefix) - 2 }} usable hosts</td></tr>{% endif %}
+      <tr><td>Machine</td><td><code>{{ network.primary.subnet }}</code></td><td>{{ 2 ** (32 - machinePrefix) - 2 }} usable hosts</td></tr>{% elif network.primary is defined and network.primary.subnet is defined %}
+      <tr><td>Machine</td><td><code>{{ network.primary.subnet }}</code></td><td>—</td></tr>{% endif %}
     </tbody>
   </table>{% endif %}{% if network.primary is defined and network.primary.vips is defined %}
   <h3>Virtual IPs</h3>

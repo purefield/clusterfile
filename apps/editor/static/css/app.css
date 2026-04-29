@@ -1882,6 +1882,94 @@ html, body {
   opacity: 0.7;
 }
 
+.bundle-info > span {
+  flex: 1;
+  min-width: 0;
+}
+
+.rendered-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-global--spacer--sm);
+  flex-wrap: nowrap;
+}
+
+.rocker-label {
+  font-size: var(--pf-global--FontSize--xs);
+  font-weight: 500;
+  color: var(--pf-global--Color--200);
+  margin-right: -2px;
+}
+
+/* Rocker switch: both options always visible; sliding thumb shows the active
+   side. Equal-width options so the thumb math is just translateX(100%). */
+.rocker {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+  background: #e7e7eb;
+  border-radius: 999px;
+  padding: 3px;
+  font-size: var(--pf-global--FontSize--xs);
+  font-weight: 500;
+  color: #4a4d52;
+  user-select: none;
+  cursor: pointer;
+  height: 26px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.rocker__opt {
+  position: relative;
+  z-index: 2;
+  width: 64px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: color 0.18s ease;
+}
+
+.rocker__opt.is-active {
+  color: #fff;
+}
+
+.rocker__thumb {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: 3px;
+  bottom: 3px;
+  width: 64px;
+  background: var(--pf-global--primary-color--100, #06c);
+  border-radius: 999px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rocker.is-content .rocker__thumb {
+  transform: translateX(64px);
+}
+
+.rocker.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rocker.is-disabled .rocker__opt {
+  pointer-events: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .rocker {
+    background: #2b2d31;
+    color: #b8babf;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+}
+
 .modal--start {
   max-width: 720px;
   width: 92%;

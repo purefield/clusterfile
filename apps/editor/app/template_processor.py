@@ -20,11 +20,74 @@ from lib.render import (
 _set_by_path = set_by_path
 
 
-def load_file(path: str) -> str:
-    """Return a placeholder for file paths (browser context)."""
-    if not path or not isinstance(path, str):
-        return ""
-    return f"<file:{path}>"
+CONTENT_ROOT = "/content"
+
+
+def content_status() -> dict:
+    """Inspect the mounted content directory.
+
+    `load_file()` calls in templates use relative paths (typically
+    ``secrets/pull-secret.json``, ``manifests/extra.yaml``,
+    ``certs/internal-ca.crt`` — anything the operator wants to inject). Mount
+    a single root at CONTENT_ROOT and the editor walks the whole subtree;
+    files in the inventory are reported by their path relative to the root,
+    matching the form the YAML uses.
+
+    Returns {"mounted": bool, "root": CONTENT_ROOT, "files": [relpaths]}.
+    """
+    if not os.path.isdir(CONTENT_ROOT):
+        return {"mounted": False, "root": CONTENT_ROOT, "files": []}
+    files = []
+    try:
+        for dirpath, _, filenames in os.walk(CONTENT_ROOT):
+            for fn in filenames:
+                full = os.path.join(dirpath, fn)
+                rel = os.path.relpath(full, CONTENT_ROOT)
+                files.append(rel)
+    except OSError:
+        pass
+    files.sort()
+    return {"mounted": True, "root": CONTENT_ROOT, "files": files}
+
+
+def _resolve_under_root(root: str, path: str) -> str | None:
+    """Resolve a relative include path under root, refusing traversal escapes."""
+    normalized = os.path.normpath(path).lstrip("/")
+    if not normalized or normalized.startswith(".."):
+        return None
+    candidate = os.path.realpath(os.path.join(root, normalized))
+    root_real = os.path.realpath(root)
+    if candidate != root_real and not candidate.startswith(root_real + os.sep):
+        return None
+    return candidate if os.path.isfile(candidate) else None
+
+
+def _make_load_file(include_content: bool):
+    """Build the load_file Jinja global.
+
+    When include_content is True and the referenced path resolves to a real
+    file under CONTENT_ROOT, return its contents (trailing newline stripped).
+    Otherwise return the documented ``<file:path>`` placeholder so rendered
+    output still shows where each file would be substituted.
+    """
+    def load_file(path: str) -> str:
+        if not path or not isinstance(path, str):
+            return ""
+        if include_content and os.path.isdir(CONTENT_ROOT):
+            full = _resolve_under_root(CONTENT_ROOT, path)
+            if full:
+                try:
+                    with open(full, "r") as f:
+                        return f.read().rstrip("\n")
+                except OSError:
+                    pass
+        return f"<file:{path}>"
+    return load_file
+
+
+# Backwards-compatible default: callers that import load_file directly still
+# get the placeholder-only behavior.
+load_file = _make_load_file(include_content=False)
 
 
 def apply_params(data: dict, params: list) -> dict:
@@ -47,7 +110,8 @@ def apply_params(data: dict, params: list) -> dict:
     return data
 
 
-def process_template(config_data: dict, template_content: str, template_dir: str) -> tuple:
+def process_template(config_data: dict, template_content: str, template_dir: str,
+                     include_content: bool = False) -> tuple:
     """Process a Jinja2 template with the given configuration data.
     Returns (output, missing_vars) tuple.
     """
@@ -63,7 +127,7 @@ def process_template(config_data: dict, template_content: str, template_dir: str
         loader_paths.append(plugins_root)
 
     env = Environment(loader=FileSystemLoader(loader_paths), undefined=LoggingUndefined)
-    env.globals["load_file"] = load_file
+    env.globals["load_file"] = _make_load_file(include_content)
     env.filters["base64encode"] = base64encode
     env.filters["as_list"] = as_list
     env.filters["passwd_hash"] = passwd_hash
@@ -75,7 +139,8 @@ def process_template(config_data: dict, template_content: str, template_dir: str
     return output, dict(LoggingUndefined._missing)
 
 
-def render_template(yaml_text: str, template_name: str, params: list, templates_dir: Path) -> dict:
+def render_template(yaml_text: str, template_name: str, params: list, templates_dir: Path,
+                    include_content: bool = False) -> dict:
     """Render a Jinja2 template with YAML data and optional parameter overrides."""
     # Parse YAML input
     try:
@@ -115,7 +180,8 @@ def render_template(yaml_text: str, template_name: str, params: list, templates_
 
     # Render template (LoggingUndefined prevents crashes on missing data)
     try:
-        processed, missing_vars = process_template(data, template_content, str(templates_dir))
+        processed, missing_vars = process_template(data, template_content, str(templates_dir),
+                                                   include_content=include_content)
         if missing_vars:
             subs = [f"{k}={v!r}" for k, v in sorted(missing_vars.items())]
             all_warnings.append(f"Substituted defaults: {', '.join(subs)}")

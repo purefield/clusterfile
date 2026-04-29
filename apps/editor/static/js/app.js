@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.22.16';
+let APP_VERSION = '3.23.0';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,16 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.23.0',
+    date: '2026-04-28',
+    changes: [
+      'Generic content mount: backend resolves any load_file() reference under a /content host mount (subtree preserved — secrets/, manifests/, certs/, ...) when an opt-in toggle is on, otherwise keeps the <file:...> placeholder. Path traversal blocked. New /api/content-status endpoint reports the mount inventory; render endpoints accept include_content',
+      'Rendered pane gets a "File: path / content" rocker switch next to Copy/Download — both options always visible, sliding thumb shows the active one, disabled with tooltip when /content is not mounted',
+      'Start modal no longer shows phantom edits: re-baselines after stamping cluster.installMethod and cluster.clusterRole so a fresh New starts with zero changes',
+      'cluster-overview.html.tpl: safe against placeholder subnet values like <subnet-cidr> — no more "list object has no element 1" preview crash on unedited starters'
+    ]
+  },
   {
     version: '3.22.22',
     date: '2026-04-27',
@@ -1194,6 +1204,10 @@ async function init() {
   // Initialize UI
   initUI();
 
+  // Detect whether the container has a /content mount and wire the toggle.
+  // Render APIs default include_content=false; toggle flips it per session.
+  fetchContentStatus().then(applyContentStatus);
+
   // Update version display in header
   updateVersionDisplay();
 
@@ -2247,7 +2261,8 @@ async function renderInstallBundleTabs(bundle, role) {
         yaml_text: State.state.currentYamlText || '',
         bundle: bundle,
         cluster_role: role,
-        params: []
+        params: [],
+        include_content: !!State.state.includeContent
       })
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2382,7 +2397,8 @@ async function autoRenderTemplate() {
         body: JSON.stringify({
           yaml_text: State.state.currentYamlText,
           template_name: templateName,
-          params: []
+          params: [],
+          include_content: !!State.state.includeContent
         })
       });
 
@@ -2399,7 +2415,8 @@ async function autoRenderTemplate() {
       body: JSON.stringify({
         yaml_text: State.state.currentYamlText,
         template_name: templateName,
-        params
+        params,
+        include_content: !!State.state.includeContent
       })
     });
 
@@ -2584,7 +2601,8 @@ async function previewClusterOverview() {
       body: JSON.stringify({
         yaml_text: yaml,
         template_name: 'cluster-overview.html.tpl',
-        params: []
+        params: [],
+        include_content: !!State.state.includeContent
       })
     });
 
@@ -3586,7 +3604,12 @@ function showStartModal() {
         const yaml = State.toYaml();
         State.state.currentYamlText = yaml;
         CodeMirror.setEditorValue(yaml, false);
+        // Stamped install method/role are part of the starting document, not
+        // user edits. Re-baseline so change tracking starts from zero.
+        State.setBaseline(yaml);
         renderCurrentSection();
+        updateChangesBadge();
+        updateHeader();
       }
     } catch (e) {
       showToast(`Error: ${e.message}`, 'error');
@@ -3966,6 +3989,102 @@ async function fetchTemplates() {
 /**
  * Fetch version from API or return embedded version
  */
+/**
+ * Fetch content-mount status. Container exposes /content if mounted; the
+ * backend responds with {mounted, root, files} where files is a sorted list
+ * of paths relative to the mount root (e.g. "secrets/pull-secret.json",
+ * "manifests/extra.yaml"). Standalone mode has no backend mount.
+ */
+async function fetchContentStatus() {
+  if (isStandaloneMode) {
+    return { mounted: false, root: '', files: [] };
+  }
+  try {
+    const r = await fetch(`${API_BASE}/api/content-status`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch (e) {
+    console.warn('content-status fetch failed:', e);
+    return { mounted: false, root: '', files: [] };
+  }
+}
+
+/**
+ * Reflect content-mount state in the rendered pane rocker and bundle-info row.
+ * Rocker shows both options ("path" | "content"); the active option is
+ * highlighted with a sliding thumb. Disabled when /content isn't mounted.
+ * Toggling re-renders the currently-shown template and bundle.
+ */
+function applyContentStatus(status) {
+  State.state.contentStatus = status;
+  if (typeof State.state.includeContent !== 'boolean') {
+    State.state.includeContent = false;
+  }
+
+  const infoRow  = document.getElementById('bundle-info-row');
+  const infoText = document.getElementById('bundle-info-text');
+  const toggle   = document.getElementById('secrets-toggle');
+  if (!toggle) return;
+
+  // Bundle-info row mirrors the toggle context.
+  if (infoText) {
+    if (status.mounted) {
+      const sample = status.files.slice(0, 3).map(Help.escapeHtml).join(', ');
+      const more = status.files.length > 3 ? `, +${status.files.length - 3} more` : '';
+      infoText.innerHTML = `Content mounted at <code>${Help.escapeHtml(status.root)}</code> — ${status.files.length} file${status.files.length === 1 ? '' : 's'}${status.files.length ? ': ' + sample + more : ''}. Any <code>load_file()</code> path resolves under the mount root.`;
+    } else {
+      infoText.innerHTML = `<code>&lt;file:…&gt;</code> placeholders are expanded by the CLI at render time. Mount a host directory at <code>/content</code> (containing <code>secrets/</code>, <code>manifests/</code>, <code>certs/</code>, etc.) to substitute content here.`;
+    }
+  }
+  if (infoRow && (status.mounted || State.state.installMethod)) {
+    infoRow.style.display = '';
+  }
+
+  const opts = toggle.querySelectorAll('.rocker__opt');
+  const setMode = (mode) => {
+    State.state.includeContent = (mode === 'content');
+    toggle.classList.toggle('is-content', mode === 'content');
+    toggle.setAttribute('aria-checked', mode === 'content' ? 'true' : 'false');
+    opts.forEach(o => o.classList.toggle('is-active', o.dataset.mode === mode));
+  };
+
+  if (status.mounted) {
+    toggle.classList.remove('is-disabled');
+    toggle.title = 'Switch how `<file:…>` references render: as the path placeholder or as substituted file content from the mounted content directory.';
+  } else {
+    toggle.classList.add('is-disabled');
+    toggle.title = 'Mount a host directory at /content to enable file-content rendering.';
+    State.state.includeContent = false;
+  }
+  setMode(State.state.includeContent ? 'content' : 'path');
+
+  if (!toggle.dataset.wired) {
+    toggle.dataset.wired = '1';
+    const flip = (mode) => {
+      if (toggle.classList.contains('is-disabled')) return;
+      const next = (mode === 'content');
+      if (next === State.state.includeContent) return;
+      setMode(mode);
+      // Re-render whatever the user is currently looking at.
+      if (typeof autoRenderTemplate === 'function' && State.state.selectedTemplate) {
+        autoRenderTemplate();
+      }
+      const bundle = State.state.installMethod;
+      const role   = State.state.clusterRole;
+      if (bundle && role && typeof renderInstallBundleTabs === 'function') {
+        renderInstallBundleTabs(bundle, role);
+      }
+    };
+    opts.forEach(opt => opt.addEventListener('click', () => flip(opt.dataset.mode)));
+    toggle.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        flip(State.state.includeContent ? 'path' : 'content');
+      }
+    });
+  }
+}
+
 async function fetchVersion() {
   // Standalone mode: use embedded version
   if (isStandaloneMode) {

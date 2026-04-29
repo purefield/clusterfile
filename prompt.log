@@ -4351,3 +4351,74 @@ Moved the bundle tabs from the Templates form section (left) to the Rendered tab
 > great, ship it and cleanup
 
 Bumped to v3.22.22, updated all five version locations and changelogs. Squash-merging the 7 granular branch commits into a single Release commit on main, tagging v3.22.22, pushing to origin, building+pushing container to quay, restarting service, verifying healthz. Cleaning up the local dev image tag and the merged feature branch.
+
+### Prompt 448
+> Q2 with mounted secrets, no local storage, 100% output only
+
+Captured architectural decision for the next round: secrets stay 100% in-memory in the browser; container additionally supports a `/secrets` mount for path-based access. No sessionStorage, no IndexedDB.
+
+### Prompt 449
+> let me test this locally, make sure there is an example secrets folder with representative values for testing.
+
+Verified `data/secrets/` already holds 12 example files (one per `x-is-file` schema field), all clearly marked `PLACEHOLDER_*`. Starters and plugin clusterfiles already reference `secrets/<filename>`. No new files needed.
+
+### Prompt 450
+> Preview failed: Template rendering failed: list object has no element 1
+> broken preview
+
+Root cause: `cluster-overview.html.tpl` calls `subnet.split('/')[1]` for capacity math, which fails when subnet is the unedited `<subnet-cidr>` placeholder. Fixed with `is defined and '/' in subnet` guards on all four capacity-calc rows; placeholder values now render with `—` for capacity instead of crashing.
+
+### Prompt 451
+> When I select new, I see chagnes, new should reset the change tracking
+
+Root cause: Start modal stamps `cluster.installMethod` and `cluster.clusterRole` on top of the freshly-loaded starter, which the change tracker correctly recorded as edits vs the starter baseline. Fixed by calling `State.setBaseline(yaml)` after stamping so the modal's selections become part of the new baseline. Fresh New now starts with zero changes.
+
+### Prompt 452
+> stage the change locally to test
+
+`podman cp` of `apps/editor/static/js/app.js` and `templates/cluster-overview.html.tpl` into the running container. Verified via `/api/render` against unedited start-sno (success: true; no crash).
+
+### Prompt 453
+> can you run the editor in a headless browser and test the generation end to end incl. template rendering with secrets? I cannot seem to get the secrets to show
+
+Headless chromium blocked by missing `libnspr4.so` (no sudo). Pivoted to `/api/render` end-to-end test, which proved exactly what was happening: the editor backend's `load_file()` always returns `<file:secrets/...>` placeholders (by design — placeholder-only behavior). Container has zero mounts. Diagnosed the gap and proposed the smallest fix: mount + opt-in `include_secrets` flag.
+
+### Prompt 454
+> do it and restart so I can test. add a toggle showing secrets are mounted - include secrets/file for render output to either hide or show the content.
+
+Implemented: backend adds `secrets_status()`, `_make_load_file(include_secrets)`, threads `include_secrets` through `process_template`/`render_template`. New `GET /api/secrets-status` endpoint returns `{mounted, root, files}`. `/api/render` and `/api/render-bundle` accept `include_secrets`. Frontend adds `fetchSecretsStatus`/`applySecretsStatus`, wires a toggle, passes `include_secrets` into all 4 render call sites. Restarted container with `-v data/secrets:/secrets:ro,Z` (SELinux relabel required after first attempt failed with permission denied). Verified: with toggle off output shows `<file:...>` placeholders; with toggle on output shows real (PLACEHOLDER) secret content.
+
+### Prompt 455
+> add a more prominent toggle file path/content next to copy/download.
+
+Moved toggle into the rendered pane header next to Copy/Download as a segmented two-button control.
+
+### Prompt 456
+> make it a toggle, not two buttons
+
+Replaced segmented control with a single iOS-style switch with a "File content" label.
+
+### Prompt 457
+> toggle not checkbox. click path, click content, click path ... toggle
+
+Replaced switch with a single labeled button that toggles between "File path" and "File content".
+
+### Prompt 458
+> ok, this is not 2000, no style, broken layout and we need to toggle meaning, we need to know our options. put some effort into it, take a look at what you built, we are wasting tokens.
+
+Rebuilt as a real rocker switch: both options always visible (so the alternative is discoverable), pill-shaped track with sliding blue thumb (Stripe/Vercel style), equal-width options (CSS-only thumb position via `transform: translateX(86px)` toggled by `.is-content` class). Keyboard-accessible (Space/Enter/← →). Tightened `.rendered-actions` flex layout to remove inline `style=` blobs. Bundle-info row underneath shows mount inventory or placeholder explanation contextually.
+
+### Prompt 459
+> great, now toggle the path/content part only File: [path] content
+
+Pulled "File" out of the rocker as a static `File:` label sitting outside; rocker shrunk to 64px per option holding just `path` and `content`.
+
+### Prompt 460
+> ship it
+
+Released v3.23.0. Bumped all five version locations, updated CHANGELOG.md, apps/editor/static/changelog.md, and the in-app CHANGELOG array. Committed, tagged v3.23.0, pushed origin main + tags, built and pushed `quay.io/dds/clusterfile-editor:v3.23.0` and `:latest`, restarted the container with `-v data/secrets:/secrets:ro,Z`, verified `/healthz` returned the new version.
+
+### Prompt 461
+> this needs to work for any files, not just secrets, consider that for include path overall. Almost need a content folder sub structure. update instructions and patterns accordingly
+
+Generalized the mount from secrets-only to any include-path. Renamed `SECRETS_ROOT` → `CONTENT_ROOT = '/content'`, `secrets_status()` → `content_status()`, `_make_load_file(include_secrets)` → `_make_load_file(include_content)`. Path resolution now preserves the full subtree (`load_file('secrets/pull-secret.json')` → `/content/secrets/pull-secret.json`, `load_file('manifests/extra.yaml')` → `/content/manifests/extra.yaml`). Inventory walks the whole tree and reports relative paths matching what the YAML uses. Path traversal blocked via realpath containment check. Renamed API endpoint `/api/secrets-status` → `/api/content-status`, request field `include_secrets` → `include_content`. Frontend renamed parallels. README expanded with mount instructions, expected layout (`secrets/`, `manifests/`, `certs/`), and security note. Run command updated to `-v /path/to/content:/content:ro,Z`. Restarted container with `-v data:/content:ro,Z` (data already has secrets/ inside); verified `/api/content-status` lists 33 files including `secrets/pull-secret.json`; verified render with `include_content=True` substitutes; verified `../../../../etc/passwd` is rejected and falls back to placeholder.
