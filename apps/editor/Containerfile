@@ -1,8 +1,8 @@
-# Clusterfile Editor v3.23.0
+# Clusterfile Editor v3.23.1
 # Schema-driven, offline-first web editor for OpenShift cluster configuration files
 #
 # Build from repo root:
-#   podman build -t quay.io/dds/clusterfile-editor:v3.23.0 -f apps/editor/Containerfile .
+#   podman build -t quay.io/dds/clusterfile-editor:v3.23.1 -f apps/editor/Containerfile .
 
 FROM python:3.12-slim
 

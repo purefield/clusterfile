@@ -4422,3 +4422,22 @@ Released v3.23.0. Bumped all five version locations, updated CHANGELOG.md, apps/
 > this needs to work for any files, not just secrets, consider that for include path overall. Almost need a content folder sub structure. update instructions and patterns accordingly
 
 Generalized the mount from secrets-only to any include-path. Renamed `SECRETS_ROOT` → `CONTENT_ROOT = '/content'`, `secrets_status()` → `content_status()`, `_make_load_file(include_secrets)` → `_make_load_file(include_content)`. Path resolution now preserves the full subtree (`load_file('secrets/pull-secret.json')` → `/content/secrets/pull-secret.json`, `load_file('manifests/extra.yaml')` → `/content/manifests/extra.yaml`). Inventory walks the whole tree and reports relative paths matching what the YAML uses. Path traversal blocked via realpath containment check. Renamed API endpoint `/api/secrets-status` → `/api/content-status`, request field `include_secrets` → `include_content`. Frontend renamed parallels. README expanded with mount instructions, expected layout (`secrets/`, `manifests/`, `certs/`), and security note. Run command updated to `-v /path/to/content:/content:ro,Z`. Restarted container with `-v data:/content:ro,Z` (data already has secrets/ inside); verified `/api/content-status` lists 33 files including `secrets/pull-secret.json`; verified render with `include_content=True` substitutes; verified `../../../../etc/passwd` is rejected and falls back to placeholder.
+
+### Prompt 462
+> toggling template in the screen vs tab is broken, switching between rendered and template and back reverts the selection. the flow is now out of sync
+
+Two parallel render paths (`autoRenderTemplate` for the dropdown selection and `renderInstallBundleTabs`/`showTab` for bundle tabs) were both writing to the same CodeMirror, and the tab-switch handler unconditionally called `autoRenderTemplate` on entering Rendered. Added persistent `State.state.renderedMode` ('bundle' | 'single') and `State.state.activeBundleIndex`. New `refreshRendered()` dispatcher used in tab switch, document load, and rocker flip — picks bundle vs single based on mode. `showTab` persists active index. Local-only fix podman-cp'd into the running container.
+
+### Prompt 463
+> I am on acm-ztp, I toggle to template, change to install-config, change back to render. now render has install-config in the bundle, shows template acm-ztp in the selector and is in a mixed mode. We should have headings on the bundles in teh template selector to toggle between bundles and if I select a single template should break out of the bundle to just show the one template. Also teh copy / download buttons need to toggle between path / content. indepdentent from the display one, we want to allow to keep the display private while aloowing them to be downlaoded
+
+Three changes in v3.23.1:
+1. Selector reorganized — bundle-based optgroups (Agent / ACM Hub / ACM ZTP / CAPI / Utility / Single templates) with a `▸ View entire <bundle>` pseudo-option (`__bundle__:<name>`) at the top of each group. Picking it switches to bundle mode for that bundle.
+2. Picking a single template clears the bundle tabs row and exits bundle mode (no more mixed state).
+3. Independent Display vs Output rockers in the rendered pane header. `Display` drives screen view; `Output` drives Copy/Download. Copy/Download go through `getRenderedForOutput()` which re-fetches via `/api/render(-bundle)` with `include_content=outputFlag` when Output mode differs from Display. Toast indicates which mode was exported.
+- Local rocker logic refactored into a generic `wireRocker(toggleId, stateKey, mounted, onChange)` helper.
+
+### Prompt 464
+> ship it
+
+Released v3.23.1. Bumped all five version locations, updated CHANGELOG.md, apps/editor/static/changelog.md, in-app CHANGELOG array. Committed, tagged v3.23.1, pushed origin main + tag, built and pushed quay.io/dds/clusterfile-editor:v3.23.1 + :latest, restarted container with -v data:/content:ro,Z, verified /healthz returned 3.23.1.

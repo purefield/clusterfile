@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.23.0';
+let APP_VERSION = '3.23.1';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,16 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.23.1',
+    date: '2026-04-28',
+    changes: [
+      'Bundle vs single-template flow no longer mixes: template selector now groups templates by bundle (Agent / ACM Hub / ACM ZTP / CAPI / Utility / Single templates) with a "▸ View entire bundle" pseudo-option per group. Picking a single template exits bundle mode and clears the bundle tabs row; picking the View entire option enters bundle mode for that bundle',
+      'Persistent rendered-pane mode: switching between Template/Rendered tabs preserves the active bundle tab and the renderedMode (bundle vs single) instead of always falling back to autoRenderTemplate',
+      'Independent Display vs Output rockers in the rendered pane header — Display drives what is shown on screen, Output drives what Copy/Download produce. Lets you keep the screen private (path) while exporting full content, or vice versa. Both default to path; Output greys out when /content is not mounted',
+      'Copy/Download fetch fresh from the API in Output mode if it differs from Display, so the export always matches the toggle even when nothing was re-rendered first'
+    ]
+  },
   {
     version: '3.23.0',
     date: '2026-04-28',
@@ -1708,7 +1718,7 @@ function setupTabs() {
           if (State.state.currentSection !== 'templates') {
             navigateToSection('templates');
           }
-          autoRenderTemplate();
+          refreshRendered();
         }
         // Always sync URL to reflect current tab
         updateEditorHash();
@@ -1894,51 +1904,75 @@ function renderTemplatesSection(container) {
   // Filter templates to only show clusterfile templates
   const clusterfileTemplates = State.state.templates.filter(t => t.type === 'clusterfile');
 
-  // Group templates by category
-  const templatesByCategory = {};
-  clusterfileTemplates.forEach(t => {
-    const category = t.category || 'other';
-    if (!templatesByCategory[category]) templatesByCategory[category] = [];
-    templatesByCategory[category].push(t);
-  });
-
-  // Category display order and labels
-  const categoryOrder = ['installation', 'credentials', 'acm', 'configuration', 'documentation', 'utility'];
-  const categoryLabels = {
-    installation: 'Installation',
-    credentials: 'Credentials',
-    acm: 'ACM / ZTP',
-    configuration: 'Configuration',
-    documentation: 'Documentation',
-    utility: 'Utility Scripts',
-    other: 'Other'
+  // Group templates by bundle (templates can belong to multiple bundles —
+  // list under each so picking from any group works). Templates with no
+  // bundle land in a "Single templates" catch-all so power users can still
+  // render arbitrary individual templates without leaving bundle mode.
+  const bundleOrder = ['agent', 'acm-hub', 'acm-ztp', 'capi', 'utility'];
+  const bundleLabels = {
+    agent:     'Agent installer bundle',
+    'acm-hub': 'ACM hub bundle',
+    'acm-ztp': 'ACM ZTP managed-cluster bundle',
+    capi:      'CAPI / Metal3 bundle',
+    utility:   'Utility templates'
   };
+  const byBundle = { __none__: [] };
+  bundleOrder.forEach(b => { byBundle[b] = []; });
+  clusterfileTemplates.forEach(t => {
+    const bundles = (t.bundle || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!bundles.length) {
+      byBundle.__none__.push(t);
+    } else {
+      bundles.forEach(b => {
+        if (!byBundle[b]) byBundle[b] = [];
+        byBundle[b].push(t);
+      });
+    }
+  });
+  // Sort each bundle by bundleOrder then filename so optgroups read in
+  // pipeline order (install-config first, etc.).
+  Object.keys(byBundle).forEach(b => {
+    byBundle[b].sort((a, c) =>
+      (a.bundleOrder ?? 99) - (c.bundleOrder ?? 99)
+      || ((a.filename || a.name) > (c.filename || c.name) ? 1 : -1)
+    );
+  });
 
-  // Build template options grouped by category
-  let templateOptions = '<option value="">-- Select Template --</option>';
-  categoryOrder.forEach(category => {
-    if (templatesByCategory[category]?.length) {
-      templateOptions += `<optgroup label="${categoryLabels[category] || category}">`;
-      templatesByCategory[category].forEach(t => {
-        const filename = t.filename || t.name;
-        const selected = PLATFORM_TEMPLATES[currentPlatform] === filename ? 'selected' : '';
-        templateOptions += `<option value="${Help.escapeHtml(filename)}" ${selected}>${Help.escapeHtml(t.name)} - ${Help.escapeHtml(t.description)}</option>`;
-      });
-      templateOptions += '</optgroup>';
-    }
+  // Build template options. Each bundle group leads with a "View entire
+  // bundle" pseudo-option (value __bundle__:<name>) that switches the
+  // Rendered pane to bundle mode. Other options pick a single template and
+  // exit bundle mode (handled in templateSelect change handler).
+  let templateOptions = '<option value="">— Select template or bundle —</option>';
+  bundleOrder.forEach(b => {
+    if (!byBundle[b].length) return;
+    templateOptions += `<optgroup label="${bundleLabels[b] || b}">`;
+    templateOptions += `<option value="__bundle__:${b}">▸ View entire ${bundleLabels[b] || b} (${byBundle[b].length} files)</option>`;
+    byBundle[b].forEach(t => {
+      const filename = t.filename || t.name;
+      templateOptions += `<option value="${Help.escapeHtml(filename)}">${Help.escapeHtml(t.name)} — ${Help.escapeHtml(t.description)}</option>`;
+    });
+    templateOptions += '</optgroup>';
   });
-  // Add any remaining categories
-  Object.keys(templatesByCategory).forEach(category => {
-    if (!categoryOrder.includes(category) && templatesByCategory[category]?.length) {
-      templateOptions += `<optgroup label="${categoryLabels[category] || category}">`;
-      templatesByCategory[category].forEach(t => {
-        const filename = t.filename || t.name;
-        const selected = PLATFORM_TEMPLATES[currentPlatform] === filename ? 'selected' : '';
-        templateOptions += `<option value="${Help.escapeHtml(filename)}" ${selected}>${Help.escapeHtml(t.name)} - ${Help.escapeHtml(t.description)}</option>`;
-      });
-      templateOptions += '</optgroup>';
-    }
+  // Bundles outside the canonical list (operators etc.) still get a group.
+  Object.keys(byBundle).forEach(b => {
+    if (b === '__none__' || bundleOrder.includes(b) || !byBundle[b].length) return;
+    templateOptions += `<optgroup label="${bundleLabels[b] || b}">`;
+    templateOptions += `<option value="__bundle__:${b}">▸ View entire ${b} bundle (${byBundle[b].length} files)</option>`;
+    byBundle[b].forEach(t => {
+      const filename = t.filename || t.name;
+      templateOptions += `<option value="${Help.escapeHtml(filename)}">${Help.escapeHtml(t.name)} — ${Help.escapeHtml(t.description)}</option>`;
+    });
+    templateOptions += '</optgroup>';
   });
+  // Templates not in any bundle.
+  if (byBundle.__none__.length) {
+    templateOptions += `<optgroup label="Single templates (no bundle)">`;
+    byBundle.__none__.forEach(t => {
+      const filename = t.filename || t.name;
+      templateOptions += `<option value="${Help.escapeHtml(filename)}">${Help.escapeHtml(t.name)} — ${Help.escapeHtml(t.description)}</option>`;
+    });
+    templateOptions += '</optgroup>';
+  }
 
   // The install bundle (if cluster.installMethod is set) is rendered as
   // nested tabs inside the Rendered tab on the right pane — see
@@ -2029,6 +2063,33 @@ function renderTemplatesSection(container) {
 
   templateSelect?.addEventListener('change', async () => {
     const templateName = templateSelect.value;
+
+    // "▸ View entire <bundle>" pseudo-options have value `__bundle__:<name>`.
+    // Selecting one switches the Rendered pane to bundle mode for that
+    // bundle, then exits without loading a single-template source.
+    if (templateName && templateName.startsWith('__bundle__:')) {
+      const bundle = templateName.slice('__bundle__:'.length);
+      const role = State.getNestedValue(State.state.currentObject, 'cluster.clusterRole') || 'standalone';
+      State.state.renderedMode = 'bundle';
+      State.state.activeBundleIndex = 0;
+      // Treat it as the user's chosen bundle for this session even if it
+      // differs from cluster.installMethod.
+      State.state.installMethod = bundle;
+      State.state.clusterRole   = role;
+      const renderedTab = document.querySelector('.tab[data-tab="rendered"]');
+      if (renderedTab) renderedTab.click();
+      renderInstallBundleTabs(bundle, role);
+      // Reset selector so the pseudo-option doesn't stick as the visible value.
+      templateSelect.value = '';
+      return;
+    }
+
+    // Picking a real template enters single-template mode and removes the
+    // bundle tabs row so the Rendered pane unambiguously shows that file.
+    if (templateName) {
+      State.state.renderedMode = 'single';
+      clearInstallBundleTabs();
+    }
     const template = State.state.templates.find(t => (t.filename || t.name) === templateName);
     const metaContainer = document.getElementById('template-meta');
 
@@ -2228,6 +2289,7 @@ function clearInstallBundleTabs() {
   if (infoRow) { infoRow.style.display = 'none'; }
   const titleEl = document.getElementById('rendered-output-title');
   if (titleEl) titleEl.textContent = 'Rendered Output';
+  State.state.activeBundleFiles = [];
 }
 
 /**
@@ -2273,14 +2335,23 @@ async function renderInstallBundleTabs(bundle, role) {
   }
 
   const files = result.files || [];
+  // Cache the file list so Copy/Download can look up the active file's name
+  // without re-hitting the API.
+  State.state.activeBundleFiles = files;
   if (!files.length) {
     tabsRow.innerHTML = `<span class="bundle-tab" style="cursor:default;">No templates match ${Help.escapeHtml(bundle)} / ${Help.escapeHtml(role)} — change install method via New.</span>`;
     return;
   }
 
-  // Build the tab buttons
+  // Restore the previously-active bundle tab so switching away and back, or
+  // toggling the rocker, doesn't reset to file 0. Clamp if the file list
+  // shrank (e.g. install method changed).
+  let active = (typeof State.state.activeBundleIndex === 'number')
+    ? State.state.activeBundleIndex : 0;
+  if (active < 0 || active >= files.length) active = 0;
+
   tabsRow.innerHTML = files.map((f, i) => `
-    <button class="bundle-tab${i === 0 ? ' is-active' : ''}${f.success ? '' : ' is-error'}"
+    <button class="bundle-tab${i === active ? ' is-active' : ''}${f.success ? '' : ' is-error'}"
             role="tab"
             data-tab-index="${i}"
             title="${Help.escapeHtml(f.description || '')}">
@@ -2299,8 +2370,10 @@ async function renderInstallBundleTabs(bundle, role) {
     tabsRow.querySelectorAll('.bundle-tab').forEach((t, ti) => {
       t.classList.toggle('is-active', ti === i);
     });
+    State.state.activeBundleIndex = i;
+    State.state.renderedMode = 'bundle';
   };
-  showTab(0);
+  showTab(active);
 
   tabsRow.querySelectorAll('.bundle-tab').forEach(tab => {
     tab.addEventListener('click', () => showTab(parseInt(tab.dataset.tabIndex, 10)));
@@ -2308,19 +2381,116 @@ async function renderInstallBundleTabs(bundle, role) {
 }
 
 /**
- * Set up template copy/download buttons
+ * Refresh the Rendered pane in whichever mode the user last chose.
+ *  - 'bundle': re-render the install bundle (preserves activeBundleIndex)
+ *  - 'single' (default): re-render the template currently in template-select
+ * Use this anywhere a re-render is needed (tab switch, rocker toggle, YAML
+ * change). Calling autoRenderTemplate directly bypasses bundle mode and
+ * clobbers the bundle tab content.
+ */
+function refreshRendered() {
+  const mode = State.state.renderedMode || (State.state.installMethod ? 'bundle' : 'single');
+  if (mode === 'bundle' && State.state.installMethod && State.state.clusterRole) {
+    renderInstallBundleTabs(State.state.installMethod, State.state.clusterRole);
+  } else {
+    autoRenderTemplate();
+  }
+}
+
+/**
+ * Set up template copy/download buttons. Copy/Download for the rendered pane
+ * always fetch fresh content honoring the Output rocker, so users can keep
+ * the screen in path mode while exporting full content (or vice versa).
  */
 function setupTemplateButtons() {
   document.getElementById('copy-template-btn')?.addEventListener('click', () => {
     const content = CodeMirror.getTemplateValue();
     navigator.clipboard.writeText(content).then(() => showToast('Copied', 'success'));
   });
-  document.getElementById('copy-rendered-btn')?.addEventListener('click', () => {
-    const content = CodeMirror.getRenderedValue();
-    navigator.clipboard.writeText(content).then(() => showToast('Copied', 'success'));
+  document.getElementById('copy-rendered-btn')?.addEventListener('click', async () => {
+    try {
+      const { content } = await getRenderedForOutput();
+      await navigator.clipboard.writeText(content);
+      const mode = State.state.includeContentForOutput ? 'content' : 'path';
+      showToast(`Copied (${mode})`, 'success');
+    } catch (e) {
+      showToast(`Copy failed: ${e.message}`, 'error');
+    }
   });
-  document.getElementById('download-rendered-btn')?.addEventListener('click', downloadRenderedOutput);
+  document.getElementById('download-rendered-btn')?.addEventListener('click', async () => {
+    try {
+      const { content, filename } = await getRenderedForOutput();
+      downloadFile(content, filename);
+      const mode = State.state.includeContentForOutput ? 'content' : 'path';
+      showToast(`Downloaded ${filename} (${mode})`, 'success');
+    } catch (e) {
+      showToast(`Download failed: ${e.message}`, 'error');
+    }
+  });
   document.getElementById('preview-rendered-btn')?.addEventListener('click', previewRenderedHtml);
+}
+
+/**
+ * Resolve {filename, content} for the active Rendered pane in the mode
+ * dictated by the Output rocker. Re-renders fresh when the Output mode
+ * differs from the Display mode; otherwise reads the editor directly.
+ */
+async function getRenderedForOutput() {
+  const out = !!State.state.includeContentForOutput;
+  const mode = State.state.renderedMode
+    || (State.state.installMethod ? 'bundle' : 'single');
+
+  // Resolve the active filename for the download name.
+  let filename = 'output';
+  if (mode === 'bundle') {
+    const idx = State.state.activeBundleIndex || 0;
+    const file = (State.state.activeBundleFiles || [])[idx];
+    if (file) filename = file.filename || filename;
+  } else {
+    filename = document.getElementById('template-select')?.value
+      || State.state.selectedTemplate || filename;
+  }
+  filename = filename.replace(/\.(tpl|tmpl)$/, '') || 'output.yaml';
+
+  // Output mode matches Display: editor already has the right content.
+  if (out === !!State.state.includeContent) {
+    return { filename, content: CodeMirror.getRenderedValue() };
+  }
+
+  // Different mode — re-render fresh with the Output flag.
+  const yaml = State.state.currentYamlText || '';
+  if (mode === 'bundle' && State.state.installMethod && State.state.clusterRole) {
+    const r = await fetch(`${API_BASE}/api/render-bundle`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        yaml_text: yaml,
+        bundle: State.state.installMethod,
+        cluster_role: State.state.clusterRole,
+        params: [],
+        include_content: out
+      })
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const json = await r.json();
+    const idx = State.state.activeBundleIndex || 0;
+    const file = (json.files || [])[idx];
+    return { filename, content: file ? (file.content || '') : '' };
+  }
+
+  const tplName = document.getElementById('template-select')?.value
+    || State.state.selectedTemplate;
+  if (!tplName) {
+    return { filename, content: CodeMirror.getRenderedValue() };
+  }
+  const r = await fetch(`${API_BASE}/api/render`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      yaml_text: yaml, template_name: tplName, params: [], include_content: out
+    })
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const json = await r.json();
+  return { filename, content: json.output || '' };
 }
 
 /**
@@ -2556,17 +2726,6 @@ function triggerParamRender() {
   paramRenderTimeout = setTimeout(() => {
     autoRenderTemplate();
   }, 500);
-}
-
-/**
- * Download rendered output with correct file extension
- */
-function downloadRenderedOutput() {
-  const output = CodeMirror.getRenderedValue();
-  const templateName = document.getElementById('template-select')?.value || State.state.selectedTemplate || 'output';
-  // Remove .tpl/.tmpl suffix to get the actual output filename (e.g., install-config.yaml.tpl → install-config.yaml)
-  const filename = templateName.replace(/\.(tpl|tmpl)$/, '') || 'output.yaml';
-  downloadFile(output, filename);
 }
 
 /**
@@ -3274,8 +3433,8 @@ function loadDocument(yamlText, filename = 'untitled.clusterfile', setAsBaseline
 
   // Re-render template if Rendered tab is active
   const renderedTab = document.querySelector('.tab[data-tab="rendered"]');
-  if (renderedTab?.classList.contains('tab--active') && State.state.selectedTemplate) {
-    autoRenderTemplate();
+  if (renderedTab?.classList.contains('tab--active')) {
+    refreshRendered();
   }
 
   // Sync URL with new sample filename
@@ -4010,23 +4169,59 @@ async function fetchContentStatus() {
 }
 
 /**
- * Reflect content-mount state in the rendered pane rocker and bundle-info row.
- * Rocker shows both options ("path" | "content"); the active option is
- * highlighted with a sliding thumb. Disabled when /content isn't mounted.
- * Toggling re-renders the currently-shown template and bundle.
+ * Wire one rocker toggle. Drives `State.state[stateKey]` and re-renders via
+ * `onChange` when flipped. Disabled when the /content mount is absent.
+ */
+function wireRocker(toggleId, stateKey, mounted, onChange) {
+  const toggle = document.getElementById(toggleId);
+  if (!toggle) return;
+  if (typeof State.state[stateKey] !== 'boolean') State.state[stateKey] = false;
+  const opts = toggle.querySelectorAll('.rocker__opt');
+  const setMode = (mode) => {
+    State.state[stateKey] = (mode === 'content');
+    toggle.classList.toggle('is-content', mode === 'content');
+    toggle.setAttribute('aria-checked', mode === 'content' ? 'true' : 'false');
+    opts.forEach(o => o.classList.toggle('is-active', o.dataset.mode === mode));
+  };
+  if (!mounted) {
+    State.state[stateKey] = false;
+    toggle.classList.add('is-disabled');
+  } else {
+    toggle.classList.remove('is-disabled');
+  }
+  setMode(State.state[stateKey] ? 'content' : 'path');
+  if (!toggle.dataset.wired) {
+    toggle.dataset.wired = '1';
+    const flip = (mode) => {
+      if (toggle.classList.contains('is-disabled')) return;
+      const next = (mode === 'content');
+      if (next === State.state[stateKey]) return;
+      setMode(mode);
+      if (onChange) onChange();
+    };
+    opts.forEach(opt => opt.addEventListener('click', () => flip(opt.dataset.mode)));
+    toggle.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        flip(State.state[stateKey] ? 'path' : 'content');
+      }
+    });
+  }
+}
+
+/**
+ * Reflect content-mount state in the bundle-info row and wire both rockers.
+ *  - Display rocker (#secrets-toggle) drives State.includeContent — what's
+ *    shown on screen. Flipping it re-renders the active mode.
+ *  - Output rocker (#output-toggle) drives State.includeContentForOutput —
+ *    what Copy/Download produce. Independent so a private screen can still
+ *    export full content (or vice versa). No re-render on flip.
  */
 function applyContentStatus(status) {
   State.state.contentStatus = status;
-  if (typeof State.state.includeContent !== 'boolean') {
-    State.state.includeContent = false;
-  }
 
   const infoRow  = document.getElementById('bundle-info-row');
   const infoText = document.getElementById('bundle-info-text');
-  const toggle   = document.getElementById('secrets-toggle');
-  if (!toggle) return;
-
-  // Bundle-info row mirrors the toggle context.
   if (infoText) {
     if (status.mounted) {
       const sample = status.files.slice(0, 3).map(Help.escapeHtml).join(', ');
@@ -4040,49 +4235,8 @@ function applyContentStatus(status) {
     infoRow.style.display = '';
   }
 
-  const opts = toggle.querySelectorAll('.rocker__opt');
-  const setMode = (mode) => {
-    State.state.includeContent = (mode === 'content');
-    toggle.classList.toggle('is-content', mode === 'content');
-    toggle.setAttribute('aria-checked', mode === 'content' ? 'true' : 'false');
-    opts.forEach(o => o.classList.toggle('is-active', o.dataset.mode === mode));
-  };
-
-  if (status.mounted) {
-    toggle.classList.remove('is-disabled');
-    toggle.title = 'Switch how `<file:…>` references render: as the path placeholder or as substituted file content from the mounted content directory.';
-  } else {
-    toggle.classList.add('is-disabled');
-    toggle.title = 'Mount a host directory at /content to enable file-content rendering.';
-    State.state.includeContent = false;
-  }
-  setMode(State.state.includeContent ? 'content' : 'path');
-
-  if (!toggle.dataset.wired) {
-    toggle.dataset.wired = '1';
-    const flip = (mode) => {
-      if (toggle.classList.contains('is-disabled')) return;
-      const next = (mode === 'content');
-      if (next === State.state.includeContent) return;
-      setMode(mode);
-      // Re-render whatever the user is currently looking at.
-      if (typeof autoRenderTemplate === 'function' && State.state.selectedTemplate) {
-        autoRenderTemplate();
-      }
-      const bundle = State.state.installMethod;
-      const role   = State.state.clusterRole;
-      if (bundle && role && typeof renderInstallBundleTabs === 'function') {
-        renderInstallBundleTabs(bundle, role);
-      }
-    };
-    opts.forEach(opt => opt.addEventListener('click', () => flip(opt.dataset.mode)));
-    toggle.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === ' ' || e.key === 'Enter') {
-        e.preventDefault();
-        flip(State.state.includeContent ? 'path' : 'content');
-      }
-    });
-  }
+  wireRocker('secrets-toggle', 'includeContent', status.mounted, refreshRendered);
+  wireRocker('output-toggle', 'includeContentForOutput', status.mounted, null);
 }
 
 async function fetchVersion() {

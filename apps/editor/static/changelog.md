@@ -1,5 +1,11 @@
 # Clusterfile Editor Changelog
 
+## 3.23.1
+- **Bundle vs single-template flow fixed**: the template selector now groups templates by bundle (Agent / ACM Hub / ACM ZTP / CAPI / Utility / Single templates) with a `▸ View entire bundle` pseudo-option at the top of each group. Picking a single template exits bundle mode and clears the bundle tabs row; picking the View entire option enters bundle mode. No more mixed state where the dropdown shows one thing and the bundle tabs show another.
+- **Switching between Template and Rendered tabs no longer reverts your selection** — the rendered pane remembers which bundle tab was active and which mode (bundle vs single) you were in.
+- **Independent Display and Output rockers** in the rendered pane header. Display drives what's on screen; Output drives what Copy/Download produce. Keep the screen safe (path placeholders) while exporting full content, or vice versa. Both default to `path`; Output greys out when `/content` isn't mounted.
+- **Copy/Download** re-fetch from the API when Output mode differs from Display, so the export always matches the toggle.
+
 ## 3.23.0
 - **Mount your content directory and render real files**: container now honors a `/content` mount that resolves *any* `load_file()` reference — not just secrets. Lay out subdirs the way your clusterfile references them (`secrets/`, `manifests/`, `certs/`, …) and run with `-v /path/to/your/content:/content:ro,Z`. With no mount, the editor keeps rendering `<file:…>` placeholders exactly like before. Path-traversal escapes are blocked.
 - **"File: path | content" rocker** in the Rendered pane next to Copy/Download. Both options are always visible — you can see the alternative without clicking. Greyed out with a tooltip when `/content` isn't mounted.

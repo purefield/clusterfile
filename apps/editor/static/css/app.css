@@ -1901,6 +1901,13 @@ html, body {
   margin-right: -2px;
 }
 
+.rocker-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--pf-global--BorderColor--100);
+  margin: 0 4px;
+}
+
 /* Rocker switch: both options always visible; sliding thumb shows the active
    side. Equal-width options so the thumb math is just translateX(100%). */
 .rocker {
