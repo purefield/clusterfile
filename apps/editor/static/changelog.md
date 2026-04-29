@@ -1,5 +1,8 @@
 # Clusterfile Editor Changelog
 
+## 3.24.1
+- **CAPI provisioning fix**: BareMetalHosts in the CAPI/M3 bundle now carry the `infraenvs.agent-install.openshift.io: <cluster.name>` label plus `bmac.agent-install.openshift.io/hostname` and `…/role` annotations — the binding the bmac controller needs to patch the discovery ISO URL onto `BMH.spec.image` so Ironic can boot it via virtual media. NMStateConfigs get the same label so the InfraEnv selects them for static-network configuration. Mirrors the ZTP pattern that has always worked. ZTP behavior unchanged.
+
 ## 3.24.0
 - **Download Agent ISO** — the editor now produces a deploy-ready `<cluster>-agent-<arch>.iso` for any OCP version, fully self-contained. `openshift-install` + `oc` are fetched on first request per version and persist in a host-mounted `/cache` so subsequent builds finish in seconds. New button in the Rendered pane appears when `cluster.installMethod=agent`; greyed out with a setup dialog when `/cache` isn't mounted, the pull secret is unresolved, or the bundle has unresolved `<file:…>` placeholders. Disconnected installs work via the existing `cluster.mirrors` / `cluster.disconnected` flow.
 - **Upload secrets in the browser** — every file-path field in the form has an **Upload** button. Files are read with FileReader and held in browser memory only (no `localStorage` / `sessionStorage` / `IndexedDB`); reload wipes them. The map travels with every render request and overrides anything under `/content`. Closes the loop for users who don't want to mount a secrets directory.

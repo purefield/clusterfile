@@ -277,6 +277,7 @@ items:
   apiVersion: agent-install.openshift.io/v1beta1
   metadata:
     labels:
+      infraenvs.agent-install.openshift.io: {{ cluster.name }}
       node: {{ shortname }}
       role: {{ 'control' if host.role == 'control' else 'worker' }}
     name: {{ shortname }}-nmstate
@@ -289,11 +290,14 @@ items:
   {%- set hasExplicitIgnitionOverride = host.ignitionConfigOverride is defined -%}
   {%- set effectiveIgnitionOverride = host.ignitionConfigOverride if hasExplicitIgnitionOverride else generatedDiscoveryIgnitionOverride %}
   metadata:
-    annotations:{% if not bmIronic.inspection | default(true) %}
+    annotations:
+      bmac.agent-install.openshift.io/hostname: {{ name }}
+      bmac.agent-install.openshift.io/role: {{ 'master' if host.role == 'control' else 'worker' }}{% if not bmIronic.inspection | default(true) %}
       inspect.metal3.io: disabled{% endif %}{%- set allNodeLabels = ({"topology.kubernetes.io/zone": host.zone} if host.zone is defined else {}) | merge(host.nodeLabels | default({})) %}{% if allNodeLabels %}
       bmac.agent-install.openshift.io/node-labels: '{{ allNodeLabels | tojson }}'{% endif %}{% if hasExplicitIgnitionOverride or effectiveIgnitionOverride %}
       bmac.agent-install.openshift.io/ignition-config-overrides: '{{ effectiveIgnitionOverride | trim }}'{% endif %}
     labels:
+      infraenvs.agent-install.openshift.io: {{ cluster.name }}
       node: {{ shortname }}
       role: {{ 'control' if host.role == 'control' else 'worker' }}
     name: {{ name }}

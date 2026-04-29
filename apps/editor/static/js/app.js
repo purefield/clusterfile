@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.24.0';
+let APP_VERSION = '3.24.1';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,13 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.24.1',
+    date: '2026-04-29',
+    changes: [
+      'CAPI fix: BareMetalHosts in the CAPI/M3 bundle now carry the infraenvs.agent-install.openshift.io: <cluster.name> label and bmac.agent-install.openshift.io/{hostname, role} annotations — the binding the bmac controller needs to inject the discovery ISO URL into BMH.spec.image. NMStateConfigs get the same label so the InfraEnv selects them for static-network config. Mirrors the ZTP pattern that has always worked'
+    ]
+  },
   {
     version: '3.24.0',
     date: '2026-04-29',

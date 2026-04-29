@@ -4476,3 +4476,19 @@ Diagnosis (no fix yet): Top suspect is `osImageHost` not threaded into acm-capi-
 > let's ship the pending changes first, then update template to fix the capi issues only.
 
 Released v3.24.0. Bumped all five version locations, updated CHANGELOG.md, apps/editor/static/changelog.md, in-app CHANGELOG array. Squash-merged feat-iso-q1-q2 → main, tagged v3.24.0, pushed origin main + tag, built + pushed quay.io/dds/clusterfile-editor:v3.24.0 + :latest, restarted container with -v data:/content:ro,Z + -v cache:/cache:Z, verified /healthz returned 3.24.0. CAPI osImageHost fix deferred to v3.24.1.
+
+### Prompt 472
+> this has been broken for some time for connected installs too.
+> [+ ironic defaults discussion + provider behavior research]
+
+Refined diagnosis: the `infraenvs.agent-install.openshift.io: <cluster.name>` BMH label has never been in `acm-capi-m3.yaml.tpl` (going back to v2.9.3 and the file's first draft), but was always in `acm-ztp.yaml.tpl`. Without that label the bmac controller never patches `BMH.spec.image.url` with the discovery ISO URL, so Ironic has nothing to mount as virtual media — exact "no boot ISO injected" symptom. CAPI flow has been relying on the openshift-assisted CAPI provider to auto-label BMHs, which the provider likely stopped doing on the ACM 2.10 → 2.11 GA tightening. Defensive fix: add the label/annotations to the template, idempotent if a future provider auto-labels.
+
+### Prompt 473
+> tighten template up, I will test it
+
+Edited `templates/acm-capi-m3.yaml.tpl` BareMetalHost + NMStateConfig sections. Added `bmac.agent-install.openshift.io/hostname` and `bmac.agent-install.openshift.io/role` annotations to BMH; added `infraenvs.agent-install.openshift.io: <cluster.name>` label to both BMH and NMStateConfig. Test-rendered SNO and compact 3-node clusterfiles; bmac.role correctly maps control→master, worker→worker; infraenv label set on every BMH/NMStateConfig.
+
+### Prompt 474
+> ship it
+
+Released v3.24.1 (patch). Bumped all five version locations, updated CHANGELOG.md, apps/editor/static/changelog.md, in-app CHANGELOG array. Committed on main, tagged v3.24.1, pushed origin main + tag, built and pushed quay.io/dds/clusterfile-editor:v3.24.1 + :latest, restarted container with -v data:/content:ro,Z + -v cache:/cache:Z, verified /healthz returned 3.24.1.
