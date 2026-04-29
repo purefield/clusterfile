@@ -35,10 +35,16 @@
     }
   });
 
-  // Custom filter: load_file (placeholder in browser mode)
-  // In browser-only mode, we can't read files, so return a placeholder
+  // Custom filter: load_file (resolves from in-memory uploads in standalone)
+  // Browser mode can't read host files; the uploaded-files map (Q2) provides
+  // per-session content. Resolution: in-memory map > <file:path> placeholder.
   env.addFilter('load_file', function(path) {
     if (path === null || path === undefined) return '';
+    const map = (window.EditorState && window.EditorState.state &&
+                 window.EditorState.state.uploadedFiles) || {};
+    if (Object.prototype.hasOwnProperty.call(map, path)) {
+      return String(map[path] || '');
+    }
     return `<file:${path}>`;
   });
 

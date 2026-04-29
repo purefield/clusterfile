@@ -16,6 +16,14 @@ let onFormChange = null;
 const FORM_SYNC_DELAY = 300;
 
 /**
+ * Fire when the in-memory uploaded-files map changes (add/remove). Listeners
+ * (app.js) refresh the Rendered pane and the uploaded-files indicator.
+ */
+function notifyUploadedFilesChanged() {
+  document.dispatchEvent(new CustomEvent('uploadedFilesChanged'));
+}
+
+/**
  * Resolve $ref in schema
  * @param {object} schema - Schema that might contain $ref
  * @param {object} rootSchema - Root schema containing $defs
@@ -691,41 +699,103 @@ function renderStringField(path, key, schema, value) {
   if (schema['x-is-file']) {
     const fileContainer = document.createElement('div');
     fileContainer.className = 'file-path-input';
-    fileContainer.style.display = 'flex';
-    fileContainer.style.alignItems = 'center';
-    fileContainer.style.gap = '8px';
 
-    // File icon (modern SVG)
     const fileIcon = document.createElement('span');
     fileIcon.className = 'file-path-icon';
     fileIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
-    fileIcon.title = 'File path reference \u2014 content stays local, read only at render time';
+    fileIcon.title = 'File path reference \u2014 the editor never reads this from your machine; the renderer resolves it at render time.';
     fileContainer.appendChild(fileIcon);
 
     const input = document.createElement('input');
     input.type = 'text';
     input.className = 'form-input form-input--file-path';
     input.id = `field-${path.replace(/[.\[\]"]/g, '-')}`;
-    // Show actual value, not redacted - redaction only happens in localStorage
     input.value = value || '';
-    input.placeholder = '/path/to/file';
-
+    input.placeholder = 'secrets/pull-secret.json';
     input.addEventListener('input', () => {
       updateFieldValue(path, input.value, schema);
+      refreshBadge();
     });
-
     fileContainer.appendChild(input);
 
-    // Info tooltip (modern SVG)
+    // In-memory upload \u2014 FileReader stashes the file in State.uploadedFiles
+    // keyed by the path string. NEVER persisted; cleared on reload.
+    const uploadBtn = document.createElement('button');
+    uploadBtn.type = 'button';
+    uploadBtn.className = 'btn btn--secondary btn--sm file-path-upload';
+    uploadBtn.textContent = 'Upload';
+    uploadBtn.title = 'Read a file from your machine into in-memory storage. Renders use this content instead of /content for the path above. Cleared when the page reloads \u2014 never written to localStorage / sessionStorage / IndexedDB.';
+
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'file';
+    hiddenInput.style.display = 'none';
+
+    const badge = document.createElement('span');
+    badge.className = 'file-path-badge';
+    badge.style.display = 'none';
+    badge.title = 'Click to clear this in-memory upload.';
+
+    function refreshBadge() {
+      const key = (input.value || '').trim();
+      const map = State.state?.uploadedFiles || {};
+      if (key && Object.prototype.hasOwnProperty.call(map, key)) {
+        const len = (map[key] || '').length;
+        badge.textContent = `\u2713 in-memory \u00b7 ${len.toLocaleString()} chars`;
+        badge.style.display = 'inline-flex';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    uploadBtn.addEventListener('click', () => {
+      const key = (input.value || '').trim();
+      if (!key) {
+        alert('Set the path above first \u2014 that becomes the lookup key for this upload.');
+        return;
+      }
+      hiddenInput.click();
+    });
+
+    hiddenInput.addEventListener('change', () => {
+      const file = hiddenInput.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (!State.state.uploadedFiles) State.state.uploadedFiles = {};
+        const key = (input.value || '').trim();
+        State.state.uploadedFiles[key] = String(reader.result || '');
+        refreshBadge();
+        notifyUploadedFilesChanged();
+        if (onFormChange) onFormChange();
+      };
+      reader.readAsText(file);
+      hiddenInput.value = '';
+    });
+
+    badge.addEventListener('click', () => {
+      const key = (input.value || '').trim();
+      if (State.state?.uploadedFiles && key in State.state.uploadedFiles) {
+        delete State.state.uploadedFiles[key];
+        refreshBadge();
+        notifyUploadedFilesChanged();
+        if (onFormChange) onFormChange();
+      }
+    });
+
+    fileContainer.appendChild(uploadBtn);
+    fileContainer.appendChild(hiddenInput);
+    fileContainer.appendChild(badge);
+
     const infoIcon = document.createElement('span');
     infoIcon.className = 'file-path-info';
     infoIcon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="16" height="16"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
-    infoIcon.title = 'This path will be read by the template processor when run locally. The file contents are never stored in the browser.';
+    infoIcon.title = 'Resolution at render time: in-memory upload (this session) \u2192 mounted /content \u2192 <file:path> placeholder.';
     infoIcon.style.cursor = 'help';
     fileContainer.appendChild(infoIcon);
 
     group.appendChild(fileContainer);
     addFieldDescription(group, schema);
+    refreshBadge();
     return group;
   }
 

@@ -319,16 +319,24 @@ podman run -d --name clusterfile-editor -p 8000:8000 quay.io/dds/clusterfile-edi
 # Open http://localhost:8000
 ```
 
-### Mounting your include content (optional)
+### Mounting your include content (optional, but required for the agent ISO download)
 
 Templates use `load_file()` to inline pull secrets, SSH keys, certs, BMC
 passwords, extra manifests — anything referenced by an `x-is-file` schema
-field. The container can substitute those references for you at render time.
+field. The container can substitute those references for you at render time
+when you mount the directory whose layout matches the paths in your
+clusterfile at `/content` (read-only). Without it, every reference renders
+as its `<file:…>` placeholder.
 
-Mount the directory whose layout matches the paths in your clusterfile at
-`/content` (read-only) and flip the **File: path | content** rocker in the
-Rendered pane to show real bytes. With no mount, every reference renders as
-its `<file:…>` placeholder, exactly the form `process.py` (CLI) accepts.
+Two complementary ways to provide content:
+
+1. **Host mount at `/content`** — for files that live on the operator's
+   host (typical for production secrets). Lay out subdirs the way your
+   clusterfile references them.
+2. **Per-session in-browser uploads** — every `x-is-file` field in the form
+   has an **Upload** button. Files are held in memory only (no
+   `localStorage`/`sessionStorage`/`IndexedDB`) and reload wipes them. No
+   mount needed.
 
 ```bash
 # Layout under /content mirrors the paths your clusterfile uses, e.g.:
@@ -341,10 +349,67 @@ podman run -d --name clusterfile-editor -p 8000:8000 \
   quay.io/dds/clusterfile-editor:latest
 ```
 
-The editor never persists or returns content via the inventory endpoint — it
-lists relative paths only and reads file bytes only when you explicitly opt
-in via the rocker (per-render `include_content=true`). Path-traversal
-escapes (`../`) are blocked.
+**Per-restart unlock key.** When `/content` is mounted, reads are gated on a
+per-restart secret printed once to stdout when the app starts. The UI prompts
+for it the first time you flip **File: content** or click **Download Agent
+ISO**. Get it via `podman logs clusterfile-editor 2>&1 | grep -A1 "unlock key"`.
+Stored in browser memory only; never written to local storage; regenerated on
+every restart.
+
+Path-traversal escapes (`../`) are blocked. The inventory endpoint returns
+relative paths only, never file content.
+
+### Mounting the agent ISO build cache (required for the agent ISO download)
+
+The **Download Agent ISO** button runs `openshift-install agent create image`
+inside the container. To avoid re-downloading `openshift-install` (~600 MB)
+and the RHCOS live ISO (~1 GB) every restart, mount a writable host directory
+at `/cache`:
+
+```bash
+# Create the cache dir and chown it so the container's editor user can write.
+# Container user is UID 999 inside; outside the user namespace this is one of
+# your subuid range. `podman unshare chown` handles the mapping for you.
+mkdir -p /path/to/cache
+podman unshare chown -R 999:999 /path/to/cache
+
+podman run -d --replace --network host --name clusterfile-editor \
+  -v /path/to/your/content:/content:ro,Z \
+  -v /path/to/cache:/cache:Z \
+  quay.io/dds/clusterfile-editor:latest
+```
+
+Cache layout (managed by the editor — don't touch):
+
+```
+/path/to/cache/
+  bin/
+    openshift-install/
+      4.21.0/x86_64/openshift-install
+      4.20.5/x86_64/openshift-install
+  agent/
+    image_cache/                     # RHCOS live ISO per OCP version
+```
+
+**Disconnected / air-gapped editor host.** Pre-stage on a connected machine:
+
+```
+# 1. Pre-cache openshift-install for the OCP versions you need
+mkdir -p /path/to/cache/bin/openshift-install/4.21.0/x86_64
+curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.21.0/openshift-install-linux.tar.gz \
+  | tar -xz -C /path/to/cache/bin/openshift-install/4.21.0/x86_64 openshift-install
+
+# 2. Pre-cache the RHCOS live ISO matching the version
+mkdir -p /path/to/cache/agent/image_cache
+# (download from mirror.openshift.com per your OCP version)
+
+# 3. Move /path/to/cache to your air-gapped host and run the editor with no internet.
+```
+
+The agent installer respects mirror configuration from your clusterfile
+(`cluster.mirrors`, `cluster.disconnected`, `cluster.catalogSources`,
+`network.trustBundle`), so disconnected installs Just Work once the binary
+and RHCOS are cached locally.
 
 ### Build from source
 

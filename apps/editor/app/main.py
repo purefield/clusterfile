@@ -9,11 +9,16 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse, Response
 from pathlib import Path
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Dict, List, Optional
 import json
 import os
 
-from app.template_processor import render_template, list_templates, get_template_content, content_status
+from app.template_processor import (
+    render_template, list_templates, get_template_content, content_status, is_unlock_valid,
+)
+from app.iso_builder import agent_iso_status, build_agent_iso, container_arch
+import shutil
+from starlette.background import BackgroundTask
 
 # Read version from APP_VERSION file
 VERSION_FILE = Path(__file__).resolve().parent.parent / "APP_VERSION"
@@ -32,6 +37,9 @@ class RenderRequest(BaseModel):
     template_name: str
     params: Optional[List[str]] = []
     include_content: bool = False
+    # In-memory file overrides (browser FileReader). Path-keyed; values are the
+    # file contents as strings. Highest priority for load_file() resolution.
+    files: Optional[Dict[str, str]] = None
 
 
 class RenderBundleRequest(BaseModel):
@@ -41,6 +49,7 @@ class RenderBundleRequest(BaseModel):
     cluster_role: str   # standalone | hub | managed
     params: Optional[List[str]] = []
     include_content: bool = False
+    files: Optional[Dict[str, str]] = None
 
 
 # Content Security Policy for offline-first security
@@ -153,6 +162,80 @@ async def get_templates():
     return {"templates": templates}
 
 
+class AgentIsoRequest(BaseModel):
+    """Request body for the agent ISO builder."""
+    yaml_text: str
+    arch: Optional[str] = None
+    files: Optional[Dict[str, str]] = None
+
+
+@app.get("/api/agent-iso/status")
+async def get_agent_iso_status():
+    """Combined cache + /content + pull-secret presence inventory.
+
+    The frontend uses this to enable/disable the Download Agent ISO button
+    and to tell the user what's already pre-warmed.
+    """
+    return agent_iso_status()
+
+
+@app.post("/api/content-unlock")
+async def post_content_unlock(http_request: Request):
+    """Validate a presented unlock key. Returns 200 on match, 403 otherwise.
+
+    Stateless — the UI then includes the validated key as X-Content-Unlock
+    on subsequent /api/render(-bundle) and /api/agent-iso requests.
+    """
+    body = await http_request.json()
+    key = body.get("key") if isinstance(body, dict) else None
+    if not is_unlock_valid(key):
+        raise HTTPException(status_code=403, detail="Invalid unlock key")
+    return {"valid": True}
+
+
+@app.post("/api/agent-iso")
+async def post_agent_iso(request: AgentIsoRequest, http_request: Request):
+    """Render the agent bundle, ensure the openshift-install binary is cached,
+    run `openshift-install agent create image`, and stream the ISO back.
+
+    Long-running endpoint (60s warm cache, several minutes cold first time
+    per OCP version). Browser shows a Building… modal while we work.
+    """
+    # The ISO build always renders with include_content=True. If /content is
+    # mounted, gate it on the per-restart unlock key.
+    _check_unlock(http_request, True)
+    try:
+        result = build_agent_iso(
+            yaml_text=request.yaml_text,
+            files_map=request.files,
+            templates_dir=TEMPLATES_DIR,
+            arch=request.arch,
+        )
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"ISO build failed: {e}")
+
+    iso_path = result["iso_path"]
+    install_dir = result["install_dir"]
+    arch = result["arch"]
+    cluster_name = result["cluster_name"]
+    fname = f"{cluster_name}-agent-{arch}.iso"
+
+    return FileResponse(
+        iso_path,
+        media_type="application/x-iso9660-image",
+        filename=fname,
+        # Clean up the tmp install dir after streaming completes; cache stays.
+        background=BackgroundTask(shutil.rmtree, install_dir, ignore_errors=True),
+        headers={
+            "X-Cluster-Name": cluster_name,
+            "X-OCP-Version": result["version"],
+            "X-Arch": arch,
+        },
+    )
+
+
 @app.get("/api/content-status")
 async def get_content_status():
     """Report whether the content mount is present and what files it holds.
@@ -175,15 +258,35 @@ async def get_template(template_name: str):
     return {"name": template_name, "content": result["content"]}
 
 
+def _check_unlock(http_request: Request, include_content: bool):
+    """If the caller asked for content substitution and /content is mounted,
+    require a valid X-Content-Unlock header. Raises 403 with a human-readable
+    explainer the UI surfaces in a toast."""
+    if not include_content:
+        return
+    provided = http_request.headers.get("X-Content-Unlock")
+    if not is_unlock_valid(provided):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Content reads require the per-restart unlock key. Get it from the "
+                "container logs (e.g. `podman logs clusterfile-editor`) and paste "
+                "it when prompted."
+            ),
+        )
+
+
 @app.post("/api/render")
-async def render(request: RenderRequest):
+async def render(request: RenderRequest, http_request: Request):
     """Render a Jinja2 template with YAML data and optional parameter overrides."""
+    _check_unlock(http_request, request.include_content)
     result = render_template(
         yaml_text=request.yaml_text,
         template_name=request.template_name,
         params=request.params or [],
         templates_dir=TEMPLATES_DIR,
-        include_content=request.include_content
+        include_content=request.include_content,
+        files=request.files
     )
     if not result["success"]:
         raise HTTPException(status_code=400, detail=result["error"])
@@ -191,7 +294,8 @@ async def render(request: RenderRequest):
 
 
 @app.post("/api/render-bundle")
-async def render_bundle(request: RenderBundleRequest):
+async def render_bundle(request: RenderBundleRequest, http_request: Request):
+    _check_unlock(http_request, request.include_content)
     """
     Render every template matching the requested install-method bundle and
     cluster role, ordered by bundleOrder. Returns one file per matching
@@ -213,7 +317,8 @@ async def render_bundle(request: RenderBundleRequest):
             template_name=t["filename"],
             params=request.params or [],
             templates_dir=TEMPLATES_DIR,
-            include_content=request.include_content
+            include_content=request.include_content,
+            files=request.files
         )
         files.append({
             "filename": t["filename"],

@@ -5,6 +5,7 @@ type: clusterfile
 category: acm
 platforms:
   - baremetal
+  - none
 requires:
   - cluster.name
   - cluster.sshKeys

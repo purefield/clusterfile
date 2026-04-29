@@ -1,5 +1,14 @@
 # Clusterfile Editor Changelog
 
+## 3.24.0
+- **Download Agent ISO** — the editor now produces a deploy-ready `<cluster>-agent-<arch>.iso` for any OCP version, fully self-contained. `openshift-install` + `oc` are fetched on first request per version and persist in a host-mounted `/cache` so subsequent builds finish in seconds. New button in the Rendered pane appears when `cluster.installMethod=agent`; greyed out with a setup dialog when `/cache` isn't mounted, the pull secret is unresolved, or the bundle has unresolved `<file:…>` placeholders. Disconnected installs work via the existing `cluster.mirrors` / `cluster.disconnected` flow.
+- **Upload secrets in the browser** — every file-path field in the form has an **Upload** button. Files are read with FileReader and held in browser memory only (no `localStorage` / `sessionStorage` / `IndexedDB`); reload wipes them. The map travels with every render request and overrides anything under `/content`. Closes the loop for users who don't want to mount a secrets directory.
+- **Per-restart unlock key gating `/content` reads** — when the host directory is mounted, the editor prints a one-time long random key on startup. The UI prompts for it the first time you flip **File: content** or click **Download Agent ISO**. Stored in browser memory only; regenerated on every restart so a leaked key never outlives the running app.
+- **Click a disabled rocker → setup help** — clicking a greyed-out **Display** or **Output** rocker now opens a dialog with concrete steps to enable file-content rendering (mount `/content`, upload files, paste the unlock key).
+- **SNO + ACM ZTP / CAPI** — both bundles now accept `cluster.platform: none` for SNO topology without spurious "platform 'none' is not supported" warnings.
+- **CAPI controlPlaneEndpoint fixed** to `api.<cluster>.<domain>` (was `<cluster>.<domain>` — wrong OCP DNS convention).
+- **Container base**: ubi9-minimal (was python:3.12-slim) so `nmstatectl` is available — required by the agent ISO builder for static-network validation.
+
 ## 3.23.1
 - **Bundle vs single-template flow fixed**: the template selector now groups templates by bundle (Agent / ACM Hub / ACM ZTP / CAPI / Utility / Single templates) with a `▸ View entire bundle` pseudo-option at the top of each group. Picking a single template exits bundle mode and clears the bundle tabs row; picking the View entire option enters bundle mode. No more mixed state where the dropdown shows one thing and the bundle tabs show another.
 - **Switching between Template and Rendered tabs no longer reverts your selection** — the rendered pane remembers which bundle tab was active and which mode (bundle vs single) you were in.

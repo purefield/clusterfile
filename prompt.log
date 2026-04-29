@@ -4441,3 +4441,38 @@ Three changes in v3.23.1:
 > ship it
 
 Released v3.23.1. Bumped all five version locations, updated CHANGELOG.md, apps/editor/static/changelog.md, in-app CHANGELOG array. Committed, tagged v3.23.1, pushed origin main + tag, built and pushed quay.io/dds/clusterfile-editor:v3.23.1 + :latest, restarted container with -v data:/content:ro,Z, verified /healthz returned 3.23.1.
+
+### Prompt 465
+> for Q1 use option A, Q2 use option A, focus on those. For now we had out of session changes that need to be reviewed and integrated or reverted: clusterfile/templates/acm-capi-m3.yaml.tpl, clusterfile/templates/test-dns.sh.tpl, clusterfile/resume-claude.sh, clusterfile/scripts/headless-render-test.py
+
+Reviewed: acm-capi-m3 (controlPlaneEndpoint api.<cluster>.<domain> fix) — integrate. test-dns refactor (strict-mode verifier) — integrate. resume-claude.sh + scripts/headless-render-test.py — already deleted, no action. Final plan written to plan file with Step 0 triage + Q1 (backend ISO + cache) + Q2 (browser FileReader, in-memory only) + 6-phase sequencing. Approved via ExitPlanMode.
+
+### Prompt 466
+> if secrets are mounted, generated a long secure key that the ui user has to present to enable file content display - cache only for the browser session and generated with each restart of the app and dump to stdout only
+
+Per-restart unlock key gating /content reads. secrets.token_urlsafe(32) at module import in template_processor.py; banner printed once to stdout via print(flush=True) (visible via podman logs). is_unlock_valid() uses secrets.compare_digest. Backend _check_unlock(http_request, include_content) raises 403 when /content mounted + include_content=true + missing/wrong X-Content-Unlock header. New POST /api/content-unlock for UI key validation. Frontend promptForContentUnlock() modal, gatedHeaders() helper, unlock prompt on rocker flip + ISO download. Stored in State.state.contentUnlockKey (in-memory only).
+
+### Prompt 467
+> make sure the new folders for cache and content are added to the documentation. consider a dialog for showing users in the ui when clicking/hovering over disabled show content what to do to enable it.
+
+README updated with new /content section (two complementary sources, unlock-key flow, traversal blocked) and new /cache section (layout, podman unshare chown for container user, air-gapped pre-stage). Disabled rocker affordance: clicking opens showEnableContentHelp() modal with mount instructions and one-click "Enter unlock key" CTA. Hover gets cursor:help, dashed outline, "Click for setup steps" tooltip.
+
+### Prompt 468
+> run locally to test
+
+Container running localhost/clusterfile-editor:dev-iso (UBI9-minimal base with nmstate + oc + openshift-install in /cache). Reported the unlock key, mount status, and walk-through steps for testing the rocker, file pickers, disabled-rocker dialog, and Download Agent ISO button.
+
+### Prompt 469
+> acm ztp and capi can create sno cluster, so platform none for sno needs to work there too.
+
+Updated 4 template metadata entries (acm-ztp, acm-capi-m3, acm-creds, acm-asc) to include `none` in platforms. The rendered YAML was already correct for SNO (controlCount=1 paths produce platformType: None, userManagedNetworking: true, controlPlaneAgents: 1, workerAgents: 0); only the metadata gate needed widening. Annotated `hosts.<hostname>.bmc` in requires as `(baremetal only)`.
+
+### Prompt 470
+> when running the capi create it failed. review our changes since we had it working a while ago, what changes could have broken the process after the vms had been provisioned. ACM does not even inject a boot ISO.
+
+Diagnosis (no fix yet): Top suspect is `osImageHost` not threaded into acm-capi-m3.yaml.tpl from the consolidated cluster.disconnected.osImageHost field (fed7d8f, Apr 8). acm-ztp.yaml.tpl sets it at line 37; acm-capi-m3 doesn't. Result: disconnected CAPI installs silently fall back to the upstream mirror.openshift.com URL → assisted-service can't fetch RHCOS → no ISO. Other suspects (in order): missing infraenvs.agent-install.openshift.io label on BMHs (CAPI relies on the openshift-assisted CAPI provider to auto-bind), discovery-ignition-override now mirror-conditional (c724b68), role rename controller→control (8c2ab5f) leaving stale resources on re-apply, image:{qcow2} removal (c724b68 — was dead code, ruled out).
+
+### Prompt 471
+> let's ship the pending changes first, then update template to fix the capi issues only.
+
+Released v3.24.0. Bumped all five version locations, updated CHANGELOG.md, apps/editor/static/changelog.md, in-app CHANGELOG array. Squash-merged feat-iso-q1-q2 → main, tagged v3.24.0, pushed origin main + tag, built + pushed quay.io/dds/clusterfile-editor:v3.24.0 + :latest, restarted container with -v data:/content:ro,Z + -v cache:/cache:Z, verified /healthz returned 3.24.0. CAPI osImageHost fix deferred to v3.24.1.

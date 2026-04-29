@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.23.1';
+let APP_VERSION = '3.24.0';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,20 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.24.0',
+    date: '2026-04-29',
+    changes: [
+      'Agent ISO download (Q1): new POST /api/agent-iso runs `openshift-install agent create image` inside the container against the user clusterfile and streams a deploy-ready <cluster>-agent-<arch>.iso. Required new /cache mount persists openshift-install + oc binaries (~880 MB per OCP version) and the RHCOS live ISO. New Download Agent ISO button in the Rendered pane (visible when cluster.installMethod=agent) with a Building modal and state-driven disable. Disconnected installs honored via the existing cluster.mirrors / cluster.disconnected paths',
+      'Browser file uploads (Q2): every x-is-file form field now has an Upload button. FileReader → in-memory map keyed by the YAML path string; sent with every render request as files: {path: content}. Resolution priority: per-request files > /content mount > <file:path> placeholder. NEVER persisted (no localStorage / sessionStorage / IndexedDB)',
+      'Per-restart unlock key gating /content reads: backend prints a long random key once on startup; UI prompts for it the first time you flip File: content or click Download Agent ISO. Stored in browser memory only; regenerated on every restart',
+      'Disabled rocker affordance: clicking a disabled Display/Output rocker opens a setup-help dialog with mount instructions and a one-click Enter unlock key button',
+      'ACM ZTP and CAPI bundles now accept cluster.platform: none for SNO topology (was warning baremetal-only). 4 templates updated: acm-ztp, acm-capi-m3, acm-creds, acm-asc',
+      'CAPI controlPlaneEndpoint host fixed to api.<cluster>.<domain> (was <cluster>.<domain> — invalid OCP DNS convention)',
+      'Container base switched to ubi9-minimal (was python:3.12-slim) so nmstatectl is available — required by `openshift-install agent create image` for static-network validation. Adds tar/gzip/ca-certificates for the binary fetch + extract',
+      'New /api/content-unlock and /api/agent-iso/status endpoints; render and bundle endpoints accept include_content + files map; backend gate returns 403 when /content is mounted but include_content=true is requested without a valid X-Content-Unlock header'
+    ]
+  },
   {
     version: '3.23.1',
     date: '2026-04-28',
@@ -1218,6 +1232,18 @@ async function init() {
   // Render APIs default include_content=false; toggle flips it per session.
   fetchContentStatus().then(applyContentStatus);
 
+  // Detect /cache mount + binary cache for the agent ISO download button.
+  fetchAgentIsoStatus().then(applyAgentIsoStatus);
+
+  // In-memory uploaded files (Q2): on add/remove, refresh the rendered pane
+  // and the small indicator next to the bundle-info row.
+  document.addEventListener('uploadedFilesChanged', () => {
+    refreshUploadedFilesIndicator();
+    if (typeof refreshRendered === 'function') refreshRendered();
+    if (typeof refreshAgentIsoButton === 'function') refreshAgentIsoButton();
+  });
+  refreshUploadedFilesIndicator();
+
   // Update version display in header
   updateVersionDisplay();
 
@@ -2318,13 +2344,14 @@ async function renderInstallBundleTabs(bundle, role) {
   try {
     const resp = await fetch(`${API_BASE}/api/render-bundle`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: gatedHeaders(),
       body: JSON.stringify({
         yaml_text: State.state.currentYamlText || '',
         bundle: bundle,
         cluster_role: role,
         params: [],
-        include_content: !!State.state.includeContent
+        include_content: !!State.state.includeContent,
+        files: State.state.uploadedFiles && Object.keys(State.state.uploadedFiles).length ? State.state.uploadedFiles : null
       })
     });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -2461,7 +2488,7 @@ async function getRenderedForOutput() {
   const yaml = State.state.currentYamlText || '';
   if (mode === 'bundle' && State.state.installMethod && State.state.clusterRole) {
     const r = await fetch(`${API_BASE}/api/render-bundle`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: gatedHeaders(),
       body: JSON.stringify({
         yaml_text: yaml,
         bundle: State.state.installMethod,
@@ -2483,7 +2510,7 @@ async function getRenderedForOutput() {
     return { filename, content: CodeMirror.getRenderedValue() };
   }
   const r = await fetch(`${API_BASE}/api/render`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST', headers: gatedHeaders(),
     body: JSON.stringify({
       yaml_text: yaml, template_name: tplName, params: [], include_content: out
     })
@@ -2563,12 +2590,13 @@ async function autoRenderTemplate() {
       // First render without params (baseline)
       const baselineResponse = await fetch(`${API_BASE}/api/render`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: gatedHeaders(),
         body: JSON.stringify({
           yaml_text: State.state.currentYamlText,
           template_name: templateName,
           params: [],
-          include_content: !!State.state.includeContent
+          include_content: !!State.state.includeContent,
+        files: State.state.uploadedFiles && Object.keys(State.state.uploadedFiles).length ? State.state.uploadedFiles : null
         })
       });
 
@@ -2581,12 +2609,13 @@ async function autoRenderTemplate() {
     // Render with params
     const response = await fetch(`${API_BASE}/api/render`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: gatedHeaders(),
       body: JSON.stringify({
         yaml_text: State.state.currentYamlText,
         template_name: templateName,
         params,
-        include_content: !!State.state.includeContent
+        include_content: !!State.state.includeContent,
+        files: State.state.uploadedFiles && Object.keys(State.state.uploadedFiles).length ? State.state.uploadedFiles : null
       })
     });
 
@@ -2756,12 +2785,13 @@ async function previewClusterOverview() {
   try {
     const response = await fetch(`${API_BASE}/api/render`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: gatedHeaders(),
       body: JSON.stringify({
         yaml_text: yaml,
         template_name: 'cluster-overview.html.tpl',
         params: [],
-        include_content: !!State.state.includeContent
+        include_content: !!State.state.includeContent,
+        files: State.state.uploadedFiles && Object.keys(State.state.uploadedFiles).length ? State.state.uploadedFiles : null
       })
     });
 
@@ -3254,6 +3284,7 @@ function onYamlChange(yamlText) {
   updateTodoBadge();
   updateChangesBadge();
   updateHeader();
+  if (typeof refreshAgentIsoButton === 'function') refreshAgentIsoButton();
 
   // Only re-render validation/changes/todo sections if they're active (they show dynamic content)
   const currentSection = State.state.currentSection;
@@ -3285,6 +3316,7 @@ function onFormChange() {
   updateTodoBadge();
   updateChangesBadge();
   updateHeader();
+  if (typeof refreshAgentIsoButton === 'function') refreshAgentIsoButton();
 
   // Note: Don't re-render the section here - it would destroy active form inputs
   // Change indicators are updated inline by updateFieldValue in form.js
@@ -4154,6 +4186,178 @@ async function fetchTemplates() {
  * of paths relative to the mount root (e.g. "secrets/pull-secret.json",
  * "manifests/extra.yaml"). Standalone mode has no backend mount.
  */
+/**
+ * Update the small "N file(s) uploaded in-memory" indicator in the
+ * bundle-info row. Hidden when no uploads. Click to clear all.
+ */
+function refreshUploadedFilesIndicator() {
+  const row = document.getElementById('bundle-info-row');
+  if (!row) return;
+  let badge = document.getElementById('uploaded-files-indicator');
+  const map = State.state.uploadedFiles || {};
+  const count = Object.keys(map).length;
+  if (count === 0) {
+    if (badge) badge.style.display = 'none';
+    return;
+  }
+  if (!badge) {
+    badge = document.createElement('span');
+    badge.id = 'uploaded-files-indicator';
+    badge.className = 'uploaded-files-indicator';
+    badge.title = 'In-memory file uploads from the form (this session only). Click to clear all.';
+    badge.addEventListener('click', () => {
+      if (!confirm(`Clear all ${Object.keys(State.state.uploadedFiles || {}).length} in-memory uploads?`)) return;
+      State.state.uploadedFiles = {};
+      refreshUploadedFilesIndicator();
+      if (typeof refreshRendered === 'function') refreshRendered();
+    });
+    row.appendChild(badge);
+  }
+  badge.textContent = `${count} file${count === 1 ? '' : 's'} uploaded in-memory`;
+  badge.style.display = 'inline-flex';
+  row.style.display = '';
+}
+
+/**
+ * Fetch agent-ISO status (cache mount + cached versions + content + pull
+ * secret presence). Used to enable/disable the Download Agent ISO button
+ * and to populate its tooltip.
+ */
+async function fetchAgentIsoStatus() {
+  if (isStandaloneMode) return null;
+  try {
+    const r = await fetch(`${API_BASE}/api/agent-iso/status`);
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.warn('agent-iso status fetch failed:', e);
+    return null;
+  }
+}
+
+/**
+ * Cache the latest agent-ISO status, then refresh the button's enabled state.
+ */
+function applyAgentIsoStatus(status) {
+  State.state.agentIsoStatus = status;
+  refreshAgentIsoButton();
+  // First-time wiring of the button click; safe to call repeatedly.
+  const btn = document.getElementById('agent-iso-btn');
+  if (btn && !btn.dataset.wired) {
+    btn.dataset.wired = '1';
+    btn.addEventListener('click', downloadAgentIso);
+  }
+}
+
+/**
+ * Show/hide and enable/disable the Download Agent ISO button based on the
+ * cluster's installMethod, the /cache mount, and pull-secret resolution
+ * (either the in-memory upload map or /content has it).
+ */
+function refreshAgentIsoButton() {
+  const btn = document.getElementById('agent-iso-btn');
+  if (!btn) return;
+  if (isStandaloneMode) { btn.style.display = 'none'; return; }
+
+  const installMethod = State.getNestedValue(State.state.currentObject, 'cluster.installMethod');
+  if (installMethod !== 'agent') {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = '';
+
+  const status = State.state.agentIsoStatus;
+  const reasons = [];
+  if (!status) {
+    reasons.push('Backend status unavailable');
+  } else {
+    if (!status.cache_mounted) reasons.push('Mount /cache: -v /path/to/cache:/cache:Z');
+    else if (!status.cache_writable) reasons.push('/cache mount is not writable for the editor user');
+    const pullPath = State.getNestedValue(State.state.currentObject, 'account.pullSecret') || 'secrets/pull-secret.json';
+    const haveUpload = !!(State.state.uploadedFiles && State.state.uploadedFiles[pullPath]);
+    if (!haveUpload && !status.pull_secret_present) {
+      reasons.push(`pull secret unresolved — upload "${pullPath}" via the form or place it under /content`);
+    }
+    const ver = State.getNestedValue(State.state.currentObject, 'cluster.version');
+    if (!ver) reasons.push('cluster.version is required (e.g. 4.21.0)');
+  }
+  btn.disabled = reasons.length > 0;
+  btn.title = reasons.length
+    ? reasons.join(' · ')
+    : `Build a deploy-ready agent.${status.container_arch}.iso for OCP ${State.getNestedValue(State.state.currentObject, 'cluster.version')} (cached: ${(status.cached_versions || []).map(v => v.version).join(', ') || 'none yet'}).`;
+}
+
+/**
+ * POST /api/agent-iso, show a Building modal, then save the streamed ISO.
+ * Sync request: long timeout (10 min) — first cold build can take minutes.
+ */
+async function downloadAgentIso() {
+  const btn = document.getElementById('agent-iso-btn');
+  if (!btn || btn.disabled) return;
+
+  // ISO build always reads /content (when mounted) for secrets/manifests, so
+  // prompt for the unlock key up-front rather than after a 403 round-trip.
+  const status = State.state.contentStatus || {};
+  if (status.unlock_required && !State.state.contentUnlockKey) {
+    const key = await promptForContentUnlock();
+    if (!key) return;
+  }
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal modal--iso">
+      <div class="modal__header"><h2 class="modal__title">Building agent ISO…</h2></div>
+      <div class="modal__body">
+        <p>Rendering the agent bundle, fetching <code>openshift-install</code> if needed, and producing the boot ISO.</p>
+        <p style="color: var(--pf-global--Color--200); font-size: var(--pf-global--FontSize--xs);">
+          First build for a given OCP version downloads the installer (~600 MB) and the RHCOS live ISO (~1 GB).
+          Subsequent builds reuse the cache and finish in under a minute.
+        </p>
+        <div class="iso-spinner" aria-hidden="true"></div>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  btn.disabled = true;
+
+  try {
+    const body = {
+      yaml_text: State.state.currentYamlText || '',
+      arch: (State.state.agentIsoStatus && State.state.agentIsoStatus.container_arch) || undefined,
+      files: (State.state.uploadedFiles && Object.keys(State.state.uploadedFiles).length)
+        ? State.state.uploadedFiles : null,
+    };
+    const resp = await fetch(`${API_BASE}/api/agent-iso`, {
+      method: 'POST',
+      headers: gatedHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      let detail = `HTTP ${resp.status}`;
+      try { detail = (await resp.json()).detail || detail; } catch (_) {}
+      throw new Error(detail);
+    }
+    const blob = await resp.blob();
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const m = /filename="?([^";]+)"?/.exec(cd);
+    const filename = (m && m[1]) || 'agent.iso';
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast(`Downloaded ${filename}`, 'success');
+    // Re-fetch status so the cached-versions list updates if this was the first
+    // build for this OCP version/arch.
+    fetchAgentIsoStatus().then(applyAgentIsoStatus);
+  } catch (e) {
+    showToast(`ISO build failed: ${e.message}`, 'error');
+  } finally {
+    overlay.remove();
+    refreshAgentIsoButton();
+  }
+}
+
 async function fetchContentStatus() {
   if (isStandaloneMode) {
     return { mounted: false, root: '', files: [] };
@@ -4166,6 +4370,148 @@ async function fetchContentStatus() {
     console.warn('content-status fetch failed:', e);
     return { mounted: false, root: '', files: [] };
   }
+}
+
+/**
+ * Help dialog explaining how to enable file-content rendering. Shown when
+ * the user clicks a disabled Display/Output rocker. Tailors guidance to the
+ * actual reason (no /content mount vs unlock key not yet entered).
+ */
+function showEnableContentHelp() {
+  const status  = State.state.contentStatus || {};
+  const mounted = !!status.mounted;
+  const unlockable = mounted && !State.state.contentUnlockKey;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+
+  const mountSteps = `
+    <p>The editor's <strong>File: content</strong> rocker substitutes real bytes
+       for <code>load_file()</code> references at render time. Two equally
+       supported sources:</p>
+    <ol>
+      <li><strong>Mount a host directory at <code>/content</code></strong> — the
+          subtree should match the relative paths your clusterfile uses
+          (typically <code>secrets/</code>, <code>manifests/</code>,
+          <code>certs/</code>). The editor's user inside the container needs
+          read access; on RHEL/Fedora add <code>:Z</code> for the SELinux relabel:
+        <pre>podman run -d --replace --network host --name clusterfile-editor \\
+  -v /path/to/your/content:/content:ro,Z \\
+  -v /path/to/cache:/cache:Z \\
+  quay.io/dds/clusterfile-editor:latest</pre>
+        Then open the form, enter a path, and use the <strong>Upload</strong>
+        button on each <code>x-is-file</code> field if you want to override
+        what's on disk for this session only.
+      </li>
+      <li><strong>Per-session in-browser uploads</strong> — every file-path
+          field in the form has an <strong>Upload</strong> button. Files are
+          held in memory only (no localStorage / sessionStorage / IndexedDB),
+          and reload wipes them. No mount required.</li>
+    </ol>`;
+
+  const unlockSteps = `
+    <p><code>/content</code> is mounted at <code>${Help.escapeHtml(status.root || '/content')}</code>
+       (${(status.files || []).length} files). Reading from it requires this
+       restart's unlock key. Get it from the container logs:</p>
+    <pre>podman logs clusterfile-editor 2&gt;&amp;1 | grep -A1 "unlock key"</pre>
+    <p>Then click <strong>Enter unlock key</strong> below. The key is
+       remembered in this browser tab only — never written to local
+       storage. Restarting the container generates a new key.</p>`;
+
+  overlay.innerHTML = `
+    <div class="modal modal--enable-content">
+      <div class="modal__header"><h2 class="modal__title">Enable file-content rendering</h2></div>
+      <div class="modal__body">
+        ${unlockable ? unlockSteps : mountSteps}
+      </div>
+      <div class="modal__footer">
+        ${unlockable ? '<button class="btn btn--primary" id="help-unlock">Enter unlock key</button>' : ''}
+        <button class="btn btn--secondary" id="help-close">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  overlay.querySelector('#help-close')?.addEventListener('click', () => overlay.remove());
+  overlay.querySelector('#help-unlock')?.addEventListener('click', async () => {
+    overlay.remove();
+    const key = await promptForContentUnlock();
+    if (key) {
+      // Re-evaluate rocker disabled state and refresh the rendered pane.
+      const status = await fetchContentStatus();
+      applyContentStatus(status);
+      if (typeof refreshAgentIsoButton === 'function') refreshAgentIsoButton();
+    }
+  });
+}
+
+/**
+ * Show a small modal asking for the per-restart unlock key. Resolves with
+ * the entered key on success (also stashes it in State.state.contentUnlockKey
+ * for subsequent requests), or null if the user cancels.
+ *
+ * Key is held in memory only; never written to localStorage / sessionStorage.
+ */
+async function promptForContentUnlock() {
+  if (State.state.contentUnlockKey) return State.state.contentUnlockKey;
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal modal--unlock">
+        <div class="modal__header"><h2 class="modal__title">Unlock file-content reads</h2></div>
+        <div class="modal__body">
+          <p>The editor printed a per-restart key when it started. Get it via:</p>
+          <pre style="background:var(--pf-global--BackgroundColor--200);padding:8px;border-radius:4px;font-size:var(--pf-global--FontSize--xs);">podman logs clusterfile-editor 2&gt;&amp;1 | grep -A1 "unlock key"</pre>
+          <input type="password" id="unlock-key-input" class="form-input" autocomplete="off"
+                 placeholder="Paste the unlock key" style="margin-top:12px;width:100%;">
+          <p style="margin-top:8px;color:var(--pf-global--Color--200);font-size:var(--pf-global--FontSize--xs);">
+            Stored in this browser tab only. Never persisted; reload wipes it.
+          </p>
+        </div>
+        <div class="modal__footer">
+          <button class="btn btn--secondary" id="unlock-cancel">Cancel</button>
+          <button class="btn btn--primary" id="unlock-submit">Unlock</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const input = overlay.querySelector('#unlock-key-input');
+    input.focus();
+
+    const cleanup = (val) => { overlay.remove(); resolve(val); };
+    overlay.querySelector('#unlock-cancel').addEventListener('click', () => cleanup(null));
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(null); });
+    const submit = async () => {
+      const key = (input.value || '').trim();
+      if (!key) return;
+      try {
+        const r = await fetch(`${API_BASE}/api/content-unlock`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key }),
+        });
+        if (!r.ok) throw new Error('Invalid key');
+        State.state.contentUnlockKey = key;
+        cleanup(key);
+      } catch (e) {
+        input.value = '';
+        input.placeholder = 'Wrong key — try again';
+      }
+    };
+    overlay.querySelector('#unlock-submit').addEventListener('click', submit);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+  });
+}
+
+/**
+ * Build fetch headers for any endpoint that may need the unlock key.
+ * Centralized so all gated callers stay consistent.
+ */
+function gatedHeaders() {
+  const h = { 'Content-Type': 'application/json' };
+  if (State.state.contentUnlockKey) h['X-Content-Unlock'] = State.state.contentUnlockKey;
+  return h;
 }
 
 /**
@@ -4186,16 +4532,36 @@ function wireRocker(toggleId, stateKey, mounted, onChange) {
   if (!mounted) {
     State.state[stateKey] = false;
     toggle.classList.add('is-disabled');
+    toggle.title = 'File content disabled — /content not mounted. Click for setup steps.';
   } else {
     toggle.classList.remove('is-disabled');
+    toggle.title = 'Toggle between path placeholders and substituted file content from the mounted /content directory.';
   }
   setMode(State.state[stateKey] ? 'content' : 'path');
   if (!toggle.dataset.wired) {
     toggle.dataset.wired = '1';
-    const flip = (mode) => {
+    // Click on a disabled rocker (anywhere on the pill) shows the explainer
+    // dialog with concrete steps to enable file-content rendering.
+    toggle.addEventListener('click', (e) => {
+      if (toggle.classList.contains('is-disabled')) {
+        e.preventDefault();
+        e.stopPropagation();
+        showEnableContentHelp();
+      }
+    });
+    const flip = async (mode) => {
       if (toggle.classList.contains('is-disabled')) return;
       const next = (mode === 'content');
       if (next === State.state[stateKey]) return;
+      // Gate: flipping to "content" against a mounted /content requires the
+      // per-restart unlock key. Prompt once; cancel snaps back to path.
+      if (next) {
+        const status = State.state.contentStatus || {};
+        if (status.unlock_required && !State.state.contentUnlockKey) {
+          const key = await promptForContentUnlock();
+          if (!key) return;  // user cancelled; rocker stays on path
+        }
+      }
       setMode(mode);
       if (onChange) onChange();
     };

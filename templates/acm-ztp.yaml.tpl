@@ -5,12 +5,13 @@ type: clusterfile
 category: acm
 platforms:
   - baremetal
+  - none
 requires:
   - account.pullSecret
   - cluster.name
   - cluster.sshKeys
   - network.domain
-  - hosts.<hostname>.bmc
+  - hosts.<hostname>.bmc (baremetal only)
   - hosts.<hostname>.network
 relatedTemplates:
   - acm-clusterimageset.yaml.tpl

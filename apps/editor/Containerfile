@@ -1,13 +1,35 @@
-# Clusterfile Editor v3.23.1
+# Clusterfile Editor v3.24.0
 # Schema-driven, offline-first web editor for OpenShift cluster configuration files
 #
 # Build from repo root:
-#   podman build -t quay.io/dds/clusterfile-editor:v3.23.1 -f apps/editor/Containerfile .
+#   podman build -t quay.io/dds/clusterfile-editor:v3.24.0 -f apps/editor/Containerfile .
 
-FROM python:3.12-slim
+# UBI9-minimal carries nmstate (required by `openshift-install agent create
+# image` for static-network validation) and matches the OS family that
+# openshift-install was built against. Smaller than full ubi9.
+FROM registry.access.redhat.com/ubi9-minimal:latest
 
 # Security: Create non-root user
 RUN groupadd -r editor && useradd -r -g editor editor
+
+# System packages:
+#   python3.12 + pip + setuptools — runtime
+#   nmstate                       — `openshift-install agent create image` deps
+#   tar, gzip, ca-certificates    — for fetching openshift-install from
+#                                   mirror.openshift.com and extracting it
+RUN microdnf install -y --setopt=tsflags=nodocs \
+      python3.12 \
+      python3.12-pip \
+      python3.12-setuptools \
+      nmstate \
+      tar \
+      gzip \
+      ca-certificates \
+    && microdnf clean all \
+    && ln -sf /usr/bin/python3.12 /usr/local/bin/python \
+    && ln -sf /usr/bin/python3.12 /usr/local/bin/python3 \
+    && ln -sf /usr/bin/pip3.12 /usr/local/bin/pip \
+    && ln -sf /usr/bin/pip3.12 /usr/local/bin/pip3
 
 # Install dependencies
 WORKDIR /app

@@ -59,7 +59,14 @@ const state = {
 
   // API data
   samples: [],
-  templates: []
+  templates: [],
+
+  // In-memory file uploads (Q2). Keyed by the path string the YAML uses
+  // (e.g. "secrets/pull-secret.json"), values are file contents as strings.
+  // NEVER persisted — wiped on reload/tab close. Sent with every render
+  // request as `files: {path: content}`; backend resolution order is
+  // request files map > /content mount > <file:path> placeholder.
+  uploadedFiles: {}
 };
 
 /**
