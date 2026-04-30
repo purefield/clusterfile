@@ -4492,3 +4492,29 @@ Edited `templates/acm-capi-m3.yaml.tpl` BareMetalHost + NMStateConfig sections. 
 > ship it
 
 Released v3.24.1 (patch). Bumped all five version locations, updated CHANGELOG.md, apps/editor/static/changelog.md, in-app CHANGELOG array. Committed on main, tagged v3.24.1, pushed origin main + tag, built and pushed quay.io/dds/clusterfile-editor:v3.24.1 + :latest, restarted container with -v data:/content:ro,Z + -v cache:/cache:Z, verified /healthz returned 3.24.1.
+
+### Prompt 475
+> [diagnostic results: no CAPI controllers running on the hub; CSV grep matches were just unrelated operators in the capi-system / assisted-installer namespaces]
+> resume
+
+Confirmed zero CAPI controllers reconciling — InfraEnvs are stale artifacts. Decided on path B: walk back the misleading static label, keep harmless bmac annotations, document the dependency. Edited acm-capi-m3.yaml.tpl: 18-line header comment block explaining the workaround/dependency; removed infraenvs.agent-install.openshift.io label from BMH and NMStateConfig (impossible to bind to per-machine random-suffix InfraEnvs); kept bmac.agent-install.openshift.io/hostname and /role annotations.
+
+### Prompt 476
+> can we use a job in acm to bind the infraenv ?
+
+Yes — a Job/CronJob can iterate Machines, follow Machine.spec.bootstrap.configRef → OpenshiftAssistedConfig (whose name == owned InfraEnv), follow Machine.spec.infrastructureRef → Metal3Machine, find BMH where spec.consumerRef.name matches, and label the BMH. Sketched the shell algorithm with three caveats: (1) it's a recurring need pretending to be one-shot — needs CronJob or Deployment to handle BMH replacement / scaling, (2) timing matters — must poll until consumerRef appears, (3) long-term real infra controller is the right answer.
+
+### Prompt 477
+> could it be a policy in acm also?
+
+Yes — better fit than a bare Job/CronJob. Two flavors: (A) ConfigurationPolicy with object-templates-raw doing the binding directly via hub Go templating, or (B) ConfigurationPolicy that creates a CronJob (lifecycle wrapper). A is more declarative; B is easier to debug. Both give continuous reconciliation, drift correction, ACM Governance dashboard visibility, and clean removal when the real controller arrives.
+
+### Prompt 478
+> add A to the template
+
+Created templates/includes/capi-bmh-binder-policy.yaml.tpl emitting Policy + Placement + PlacementBinding + ManagedClusterSetBinding. ConfigurationPolicy uses `lookup` + nested `range` over Machines and BMHs in the cluster namespace; matches by Metal3Machine consumerRef chain and labels each claimed BMH with the per-machine InfraEnv name. Placement targets local-cluster (the hub). First attempt had a Jinja {% raw %} whitespace bug that broke the YAML block-scalar indicator; fixed with non-stripping `{% raw %}` and explicit indentation. Wired into acm-capi-m3.yaml.tpl via {% include %}. Verified rendered Policy is well-formed YAML with the namespace correctly substituted at template-render time and Go template directives preserved for the policy controller to evaluate at runtime.
+
+### Prompt 479
+> ship it
+
+Released v3.24.2 (patch). Bumped all five version locations, updated CHANGELOG.md, apps/editor/static/changelog.md, in-app CHANGELOG array. Committed on main, tagged v3.24.2, pushed origin main + tag, built and pushed quay.io/dds/clusterfile-editor:v3.24.2 + :latest, restarted container with -v data:/content:ro,Z + -v cache:/cache:Z, verified /healthz returned 3.24.2.

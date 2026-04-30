@@ -1,5 +1,8 @@
 # Clusterfile Editor Changelog
 
+## 3.24.2
+- **CAPI BMH binding via ACM Policy** — replaces v3.24.1's static `infraenvs.agent-install.openshift.io: <cluster.name>` label (which doesn't match anything: the openshift-assisted CAPI bootstrap controller creates per-machine InfraEnvs named `<cluster>-<random>`) with a continuously-reconciled ConfigurationPolicy. The policy walks Machines + BMHs in the cluster namespace and labels each claimed BMH with the InfraEnv that the Machine's bootstrap config owns, so the bmac controller patches the discovery ISO URL onto `BMH.spec.image.url`. Unblocks CAPI provisioning on hubs that don't have the (separate) cluster-api-provider-openshift-assisted infrastructure controller installed. ZTP unchanged.
+
 ## 3.24.1
 - **CAPI provisioning fix**: BareMetalHosts in the CAPI/M3 bundle now carry the `infraenvs.agent-install.openshift.io: <cluster.name>` label plus `bmac.agent-install.openshift.io/hostname` and `…/role` annotations — the binding the bmac controller needs to patch the discovery ISO URL onto `BMH.spec.image` so Ironic can boot it via virtual media. NMStateConfigs get the same label so the InfraEnv selects them for static-network configuration. Mirrors the ZTP pattern that has always worked. ZTP behavior unchanged.
 

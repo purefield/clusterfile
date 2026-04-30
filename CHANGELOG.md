@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 ## Unreleased
 - Tooling: `scripts/extract-doc-urls.py` walks all schemas and emits `schema/x-doc-urls.csv` (115 rows × 6 columns); `scripts/import-doc-urls.py` reads the CSV and applies non-empty `new_url` values back into the source schema files (with `--dry-run` and JSON validation). Sets up the docs.redhat.com html-single URL rewrite — fill `new_url` column then re-import.
 
+## v3.24.2 (2026-04-30)
+- **CAPI BMH binding via ACM Policy** — v3.24.1 added a static `infraenvs.agent-install.openshift.io: <cluster.name>` label on BMHs in the CAPI bundle, mirroring ZTP. Diagnosis showed that's the wrong shape for CAPI: the openshift-assisted CAPI bootstrap controller creates one `OpenshiftAssistedConfig` per Machine, each owning its own `InfraEnv` named `<cluster>-<random>`. A static `<cluster.name>` value never matches. The proper integration glue is the `cluster-api-provider-openshift-assisted` infrastructure controller, which creates `AgentMachine` resources that label claimed BMHs with the per-machine InfraEnv name. That controller isn't always installed alongside the bootstrap+control-plane providers.
+- **Replacement**: new `templates/includes/capi-bmh-binder-policy.yaml.tpl` emits an ACM `Policy` + `ConfigurationPolicy` that uses hub-side Go templating (`object-templates-raw` with `lookup` + nested `range`) to:
+  - List Machines in `<cluster.name>` with the `cluster.x-k8s.io/cluster-name=<cluster.name>` label
+  - For each Machine, follow `spec.bootstrap.configRef.name` → `OpenshiftAssistedConfig` (whose name == owned InfraEnv name)
+  - For each Machine, follow `spec.infrastructureRef.name` → `Metal3Machine`
+  - Find the BMH whose `spec.consumerRef.name` equals that `Metal3Machine` name
+  - Patch the BMH with `metadata.labels.infraenvs.agent-install.openshift.io: <OpenshiftAssistedConfig name>`
+- The Policy targets `local-cluster` (the hub itself) via Placement + PlacementBinding + ManagedClusterSetBinding (`default` clusterset), all in the cluster namespace so they delete cleanly when the cluster manifests are removed. Continuous reconciliation — newly-claimed BMHs get bound seconds after Metal3 sets `consumerRef`. `pruneObjectBehavior: None` so removing the policy doesn't strip the labels (idempotent if you later install the real infra controller, which uses the same labels).
+- **Reverted in `acm-capi-m3.yaml.tpl`**: the static `infraenvs.agent-install.openshift.io: <cluster.name>` label on `BareMetalHost` and `NMStateConfig` (the misleading shape from v3.24.1). Kept the harmless `bmac.agent-install.openshift.io/{hostname, role}` annotations — those are useful regardless of how the BMH gets bound.
+- **Header comment block** added to `acm-capi-m3.yaml.tpl` documenting the controller dependency, the verification steps (`oc get crd | grep agentmachine`, `oc get pods -A | grep …infra`), and the fallback to `acm-ztp` when the infra controller is absent and the binder Policy isn't desired.
+
 ## v3.24.1 (2026-04-29)
 - **CAPI provisioning fix** — `templates/acm-capi-m3.yaml.tpl` BareMetalHost section now mirrors the ZTP pattern:
   - **annotations** add `bmac.agent-install.openshift.io/hostname: <fqdn>` and `bmac.agent-install.openshift.io/role: master|worker` (assisted-installer vocabulary)

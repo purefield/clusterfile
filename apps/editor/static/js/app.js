@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.24.1';
+let APP_VERSION = '3.24.2';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,15 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.24.2',
+    date: '2026-04-30',
+    changes: [
+      'CAPI BMH binding via ACM Policy: replaces v3.24.1\'s misleading static infraenvs.agent-install.openshift.io: <cluster.name> label (which never matches the per-machine InfraEnv names <cluster>-<random> the openshift-assisted CAPI bootstrap controller actually creates) with a continuously-reconciled ConfigurationPolicy. The policy walks Machines in the cluster namespace, follows each Machine bootstrap.configRef → OpenshiftAssistedConfig → InfraEnv chain, finds the BMH whose spec.consumerRef.name matches the Machine\'s Metal3Machine, and labels it with the matching per-machine InfraEnv name so the bmac controller patches the discovery ISO URL onto BMH.spec.image.url. Workaround for the missing cluster-api-provider-openshift-assisted infrastructure controller; removes cleanly when that controller is later installed (just delete the policy)',
+      'New include templates/includes/capi-bmh-binder-policy.yaml.tpl emits Policy + Placement + PlacementBinding + ManagedClusterSetBinding scoped to the cluster namespace, targeting local-cluster (the hub) for execution',
+      'Header comment block in acm-capi-m3.yaml.tpl documents the controller dependency and the fallback to acm-ztp when the infra controller is absent'
+    ]
+  },
   {
     version: '3.24.1',
     date: '2026-04-29',

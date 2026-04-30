@@ -23,7 +23,32 @@ clusterRole:
 bundleOrder: 1
 docs: https://github.com/openshift-assisted/cluster-api-provider-openshift-assisted
 -#}
-{#- openshift-machine-api.metal3.metal3-ironic, kubevirt-redfish.kubevirt-redfish - logs -#}
+{#-
+  Requires the openshift-assisted CAPI providers running on the hub:
+    - cluster-api-provider-openshift-assisted bootstrap controller (creates
+      OpenshiftAssistedConfig per Machine, which spawns one InfraEnv each
+      named <cluster>-<random>)
+    - cluster-api-provider-openshift-assisted infrastructure controller
+      (creates AgentMachine, which selects a BMH via the
+      AgentMachineTemplate hostSelector and labels the BMH with the
+      matching infraenvs.agent-install.openshift.io: <cluster>-<random>
+      so the bmac controller patches the discovery ISO URL onto
+      BMH.spec.image.url)
+
+  Without the infrastructure controller, no AgentMachine is ever created,
+  no BMH gets the InfraEnv label, and Ironic never receives a boot ISO —
+  BMHs sit "available" forever. Verify with:
+    oc get crd | grep agentmachine                       # CRDs installed?
+    oc get pods -A | grep -E "openshift-assisted.*infra" # controller running?
+  If the infra controller is absent, use the acm-ztp bundle instead.
+
+  This template intentionally does NOT statically label BMHs with an
+  infraenvs.agent-install.openshift.io value — the per-machine InfraEnv
+  names (<cluster>-<random>) are generated at apply time and unknowable
+  in advance, so the binding must come from the infra controller.
+
+  openshift-machine-api.metal3.metal3-ironic, kubevirt-redfish.kubevirt-redfish - logs
+-#}
 {%- set imageArch = cluster.arch | default("x86_64", true) -%}
 {%- set majorMinor = cluster.version.split('.')[:2] | join('.') -%}
 {%- set enableTang = cluster.diskEncryption is defined and cluster.diskEncryption.type | default("none") == "tang" -%}
@@ -277,7 +302,6 @@ items:
   apiVersion: agent-install.openshift.io/v1beta1
   metadata:
     labels:
-      infraenvs.agent-install.openshift.io: {{ cluster.name }}
       node: {{ shortname }}
       role: {{ 'control' if host.role == 'control' else 'worker' }}
     name: {{ shortname }}-nmstate
@@ -297,7 +321,6 @@ items:
       bmac.agent-install.openshift.io/node-labels: '{{ allNodeLabels | tojson }}'{% endif %}{% if hasExplicitIgnitionOverride or effectiveIgnitionOverride %}
       bmac.agent-install.openshift.io/ignition-config-overrides: '{{ effectiveIgnitionOverride | trim }}'{% endif %}
     labels:
-      infraenvs.agent-install.openshift.io: {{ cluster.name }}
       node: {{ shortname }}
       role: {{ 'control' if host.role == 'control' else 'worker' }}
     name: {{ name }}
@@ -370,7 +393,10 @@ items:
 {%- set osImagesSync %}{% include "includes/os-images-sync.yaml.tpl" %}{% endset %}
 {{ osImagesSync }}
 {%- set clusterImageSetSync %}{% include "includes/clusterimageset-sync.yaml.tpl" %}{% endset %}
-{{ clusterImageSetSync }}{% if (plugins | default({})).operators is defined %}
+{{ clusterImageSetSync }}
+{#- Workaround for missing CAPI infra controller — see include header. -#}
+{%- set bmhBinder %}{% include "includes/capi-bmh-binder-policy.yaml.tpl" %}{% endset %}
+{{ bmhBinder }}{% if (plugins | default({})).operators is defined %}
 {%- set ops = plugins.operators %}
 - kind: ManagedClusterSetBinding
   apiVersion: cluster.open-cluster-management.io/v1beta2
