@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.24.3';
+let APP_VERSION = '3.24.4';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,14 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.24.4',
+    date: '2026-05-01',
+    changes: [
+      'CAPI template API version bumps: Cluster v1beta1→v1beta2, OpenshiftAssistedControlPlane v1alpha2→v1alpha3, OpenshiftAssistedConfigTemplate v1alpha1→v1alpha2, MachineDeployment v1beta1→v1beta2, worker infrastructureRef v1alpha3→v1beta1. Eliminates server-side deprecation warnings on MCE v2.11.0+',
+      'BMH binder policy Machine lookup updated from v1beta1 to v1beta2'
+    ]
+  },
   {
     version: '3.24.3',
     date: '2026-05-01',

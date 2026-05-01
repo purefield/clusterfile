@@ -1,5 +1,8 @@
 # Clusterfile Editor Changelog
 
+## 3.24.4
+- **CAPI API version bumps** — Cluster `v1beta2`, OpenshiftAssistedControlPlane `v1alpha3`, OpenshiftAssistedConfigTemplate `v1alpha2`, MachineDeployment `v1beta2`, worker infrastructureRef `v1beta1`. Eliminates deprecation warnings on MCE v2.11.0+. BMH binder policy Machine lookup also bumped to `v1beta2`.
+
 ## 3.24.3
 - **ACM assisted-service AUTH_TYPE fix** — default changed from `none` to `local`. The capoa-bootstrap-controller requires an `api_key` JWT in the InfraEnv download URL to fetch ignition config; `AUTH_TYPE=none` omits the token and blocks the entire CAPI bootstrap chain. The `local` auth mode uses the auto-generated `assisted-servicelocal-auth` EC key pair — no extra setup.
 

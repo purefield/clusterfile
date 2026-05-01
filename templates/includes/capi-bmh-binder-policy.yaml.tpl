@@ -30,7 +30,7 @@
             severity: high
             pruneObjectBehavior: None
             object-templates-raw: |
-              {% raw %}{{- $machines := (lookup "cluster.x-k8s.io/v1beta1" "Machine"{% endraw %} "{{ cluster.name }}" "" "cluster.x-k8s.io/cluster-name={{ cluster.name }}"{% raw %}).items }}
+              {% raw %}{{- $machines := (lookup "cluster.x-k8s.io/v1beta2" "Machine"{% endraw %} "{{ cluster.name }}" "" "cluster.x-k8s.io/cluster-name={{ cluster.name }}"{% raw %}).items }}
               {{- $bmhs := (lookup "metal3.io/v1alpha1" "BareMetalHost"{% endraw %} "{{ cluster.name }}" ""{% raw %}).items }}
               {{- range $m := $machines }}
               {{- if and $m.spec.bootstrap.configRef $m.spec.infrastructureRef }}

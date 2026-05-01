@@ -101,7 +101,7 @@ items:
     policyController: {enabled: true}
     searchCollector: {enabled: true}
 - kind: Cluster
-  apiVersion: cluster.x-k8s.io/v1beta1
+  apiVersion: cluster.x-k8s.io/v1beta2
   metadata:
     name: {{ cluster.name }}
     namespace: {{ cluster.name }}
@@ -114,7 +114,7 @@ items:
         cidrBlocks:
           - {{ network.service.subnet }}
     controlPlaneRef: 
-      apiVersion: controlplane.cluster.x-k8s.io/v1alpha2
+      apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
       kind: OpenshiftAssistedControlPlane
       name:  {{ cluster.name }}
       namespace: {{ cluster.name }}
@@ -124,7 +124,7 @@ items:
       name: {{ cluster.name }}
       namespace: {{ cluster.name }}
 - kind: OpenshiftAssistedControlPlane
-  apiVersion: controlplane.cluster.x-k8s.io/v1alpha2
+  apiVersion: controlplane.cluster.x-k8s.io/v1alpha3
   metadata:
     name: {{ cluster.name }}
     namespace: {{ cluster.name }}
@@ -229,7 +229,7 @@ items:
   spec:
      clusterName: {{ cluster.name }}
 - kind: MachineDeployment
-  apiVersion: cluster.x-k8s.io/v1beta1
+  apiVersion: cluster.x-k8s.io/v1beta2
   metadata:
     name: {{ cluster.name }}-worker
     namespace: {{ cluster.name }}
@@ -250,14 +250,14 @@ items:
         bootstrap:
           configRef:
             name: {{ cluster.name }}-worker
-            apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
+            apiVersion: bootstrap.cluster.x-k8s.io/v1alpha2
             kind: OpenshiftAssistedConfigTemplate
         infrastructureRef:
           name: {{ cluster.name }}-worker
-          apiVersion: infrastructure.cluster.x-k8s.io/v1alpha3
+          apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
           kind: Metal3MachineTemplate
 - kind: OpenshiftAssistedConfigTemplate
-  apiVersion: bootstrap.cluster.x-k8s.io/v1alpha1
+  apiVersion: bootstrap.cluster.x-k8s.io/v1alpha2
   metadata:
     name: {{ cluster.name }}-worker
     namespace: {{ cluster.name }}

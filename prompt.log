@@ -4533,3 +4533,13 @@ Changed `AUTH_TYPE` default from `"none"` to `"local"` in `templates/acm-asc.yam
 > ship it
 
 Released v3.24.3 (patch). Changed AUTH_TYPE default from "none" to "local" in acm-asc.yaml.tpl. Updated all five version locations, changelogs, prompt.log. Committed, tagged v3.24.3, pushed, built and deployed.
+
+### Prompt 483
+> [pasted CAPI apply output showing webhook TLS cert mismatch errors + deprecation warnings for cluster.x-k8s.io/v1beta1, controlplane.cluster.x-k8s.io/v1alpha2]
+
+Diagnosed capm3 webhook TLS cert mismatch: MCE v2.11.0 upgrade renamed service to mce-capm3-webhook-service but controller was serving old cert. New cert secret (mce-capm3-webhook-service-cert) has correct SANs — controller restart fixes the TLS errors. Updated CAPI template API versions: Cluster v1beta1→v1beta2, OpenshiftAssistedControlPlane v1alpha2→v1alpha3, OpenshiftAssistedConfigTemplate v1alpha1→v1alpha2, MachineDeployment v1beta1→v1beta2, worker infrastructureRef v1alpha3→v1beta1. BMH binder policy Machine lookup v1beta1→v1beta2. Platform warning resolved by using cluster.platform: baremetal with plugins.kubevirt for the KubeVirt-specific bits.
+
+### Prompt 484
+> ship it
+
+Released v3.24.4 (patch). CAPI API version bumps in acm-capi-m3.yaml.tpl and capi-bmh-binder-policy.yaml.tpl. Updated all five version locations, changelogs, prompt.log. Committed, tagged v3.24.4, pushed, built and deployed.
