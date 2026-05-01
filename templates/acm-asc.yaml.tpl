@@ -36,7 +36,7 @@ items:
       app: assisted-service
   data:
     LOG_LEVEL: "info"
-    AUTH_TYPE: "none"
+    AUTH_TYPE: "local"
     SKIP_CERT_VERIFICATION: "True"
     ISO_IMAGE_TYPE: "full-iso"{% if network.proxy %}
     HTTP_PROXY: {{ network.proxy.httpProxy }}

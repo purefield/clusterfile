@@ -4518,3 +4518,18 @@ Created templates/includes/capi-bmh-binder-policy.yaml.tpl emitting Policy + Pla
 > ship it
 
 Released v3.24.2 (patch). Bumped all five version locations, updated CHANGELOG.md, apps/editor/static/changelog.md, in-app CHANGELOG array. Committed on main, tagged v3.24.2, pushed origin main + tag, built and pushed quay.io/dds/clusterfile-editor:v3.24.2 + :latest, restarted container with -v data:/content:ro,Z + -v cache:/cache:Z, verified /healthz returned 3.24.2.
+
+### Prompt 480
+> [pasted cluster diagnostic output: bootstrap controller logs, OpenshiftAssistedConfig status, Machine status, Metal3Machine status, BMH status, MCE conditions, MCE YAML, deploy listings, CSV status — debugging CAPI ocp-cluster2 stuck at Provisioned/not-ready]
+
+Continued CAPI provisioning debug from prior session. MCE v2.11.0 upgrade was already fixed (HyperShift/CAPI exclusivity resolved). Found next blocker: capoa-bootstrap-controller failing with "no api_key found in query string" — InfraEnv download URLs lacked JWT tokens because `assisted-service-config` ConfigMap had `AUTH_TYPE: none`. Root cause: `acm-asc.yaml.tpl` hardcoded `AUTH_TYPE: "none"`. Patched live ConfigMap to `local`, restarted assisted-service, deleted/recreated InfraEnvs — URLs now include `/byapikey/eyJ...` JWT tokens. Also found and cleaned up stale pre-upgrade MCE webhook configs (`capm3-validating-webhook-configuration` / `capm3-mutating-webhook-configuration`) that caused TLS cert mismatch errors (`AssociateM3MetaDataFailed`).
+
+### Prompt 481
+> let's make the changes durable for future acm cluster configuration and managed cluster creation
+
+Changed `AUTH_TYPE` default from `"none"` to `"local"` in `templates/acm-asc.yaml.tpl` (line 39) and `steps/acm-create-quay-config.sh` (lines 366 and 384).
+
+### Prompt 482
+> ship it
+
+Released v3.24.3 (patch). Changed AUTH_TYPE default from "none" to "local" in acm-asc.yaml.tpl. Updated all five version locations, changelogs, prompt.log. Committed, tagged v3.24.3, pushed, built and deployed.

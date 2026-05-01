@@ -1,5 +1,8 @@
 # Clusterfile Editor Changelog
 
+## 3.24.3
+- **ACM assisted-service AUTH_TYPE fix** — default changed from `none` to `local`. The capoa-bootstrap-controller requires an `api_key` JWT in the InfraEnv download URL to fetch ignition config; `AUTH_TYPE=none` omits the token and blocks the entire CAPI bootstrap chain. The `local` auth mode uses the auto-generated `assisted-servicelocal-auth` EC key pair — no extra setup.
+
 ## 3.24.2
 - **CAPI BMH binding via ACM Policy** — replaces v3.24.1's static `infraenvs.agent-install.openshift.io: <cluster.name>` label (which doesn't match anything: the openshift-assisted CAPI bootstrap controller creates per-machine InfraEnvs named `<cluster>-<random>`) with a continuously-reconciled ConfigurationPolicy. The policy walks Machines + BMHs in the cluster namespace and labels each claimed BMH with the InfraEnv that the Machine's bootstrap config owns, so the bmac controller patches the discovery ISO URL onto `BMH.spec.image.url`. Unblocks CAPI provisioning on hubs that don't have the (separate) cluster-api-provider-openshift-assisted infrastructure controller installed. ZTP unchanged.
 
