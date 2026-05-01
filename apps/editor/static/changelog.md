@@ -1,5 +1,8 @@
 # Clusterfile Editor Changelog
 
+## 3.24.5
+- **CAPI API version corrections** — Cluster and MachineDeployment reverted from `v1beta2` back to `v1beta1` (the v1beta2 conversion webhook has a bug). OpenshiftAssistedControlPlane stays at `v1alpha3` with the now-required `apiGroup` field added to `machineTemplate.infrastructureRef`. BMH binder policy Machine lookup reverted to `v1beta1` to match.
+
 ## 3.24.4
 - **CAPI API version bumps** — Cluster `v1beta2`, OpenshiftAssistedControlPlane `v1alpha3`, OpenshiftAssistedConfigTemplate `v1alpha2`, MachineDeployment `v1beta2`, worker infrastructureRef `v1beta1`. Eliminates deprecation warnings on MCE v2.11.0+. BMH binder policy Machine lookup also bumped to `v1beta2`.
 

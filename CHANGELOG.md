@@ -5,6 +5,9 @@ All notable changes to this project are documented in this file.
 ## Unreleased
 - Tooling: `scripts/extract-doc-urls.py` walks all schemas and emits `schema/x-doc-urls.csv` (115 rows × 6 columns); `scripts/import-doc-urls.py` reads the CSV and applies non-empty `new_url` values back into the source schema files (with `--dry-run` and JSON validation). Sets up the docs.redhat.com html-single URL rewrite — fill `new_url` column then re-import.
 
+## v3.24.5 (2026-05-01)
+- **CAPI API version corrections** — Cluster and MachineDeployment reverted from `v1beta2` back to `v1beta1`: the `v1beta2` conversion webhook has a bug (looks for CRD `metal3clusters.` with a missing group suffix, causing server-side failures). OpenshiftAssistedControlPlane stays at `v1alpha3` with the now-required `apiGroup: infrastructure.cluster.x-k8s.io` added to `machineTemplate.infrastructureRef`. BMH binder policy Machine lookup reverted to `v1beta1` to match.
+
 ## v3.24.4 (2026-05-01)
 - **CAPI API version bumps** — `acm-capi-m3.yaml.tpl` updated to use non-deprecated API versions available on MCE v2.11.0: Cluster `v1beta2`, OpenshiftAssistedControlPlane `v1alpha3`, OpenshiftAssistedConfigTemplate `v1alpha2`, MachineDeployment `v1beta2`, worker infrastructureRef `v1beta1` (was inconsistently `v1alpha3` while control plane already used `v1beta1`). BMH binder policy Machine lookup also bumped to `v1beta2`. Eliminates server-side deprecation warnings.
 

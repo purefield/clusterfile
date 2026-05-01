@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.24.4';
+let APP_VERSION = '3.24.5';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,13 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.24.5',
+    date: '2026-05-01',
+    changes: [
+      'CAPI API version corrections: Cluster and MachineDeployment reverted from v1beta2 back to v1beta1 — the v1beta2 conversion webhook has a bug (looks for CRD "metal3clusters." with missing group suffix). OpenshiftAssistedControlPlane kept at v1alpha3 with added apiGroup field (required by the v1alpha3 schema). BMH binder policy Machine lookup reverted to v1beta1 to match'
+    ]
+  },
   {
     version: '3.24.4',
     date: '2026-05-01',

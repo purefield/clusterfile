@@ -101,7 +101,7 @@ items:
     policyController: {enabled: true}
     searchCollector: {enabled: true}
 - kind: Cluster
-  apiVersion: cluster.x-k8s.io/v1beta2
+  apiVersion: cluster.x-k8s.io/v1beta1
   metadata:
     name: {{ cluster.name }}
     namespace: {{ cluster.name }}
@@ -158,6 +158,7 @@ items:
     machineTemplate:
       infrastructureRef:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        apiGroup: infrastructure.cluster.x-k8s.io
         kind: Metal3MachineTemplate
         name: {{ cluster.name }}-controller
         namespace: {{ cluster.name }}
@@ -229,7 +230,7 @@ items:
   spec:
      clusterName: {{ cluster.name }}
 - kind: MachineDeployment
-  apiVersion: cluster.x-k8s.io/v1beta2
+  apiVersion: cluster.x-k8s.io/v1beta1
   metadata:
     name: {{ cluster.name }}-worker
     namespace: {{ cluster.name }}

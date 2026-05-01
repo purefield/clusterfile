@@ -4543,3 +4543,43 @@ Diagnosed capm3 webhook TLS cert mismatch: MCE v2.11.0 upgrade renamed service t
 > ship it
 
 Released v3.24.4 (patch). CAPI API version bumps in acm-capi-m3.yaml.tpl and capi-bmh-binder-policy.yaml.tpl. Updated all five version locations, changelogs, prompt.log. Committed, tagged v3.24.4, pushed, built and deployed.
+
+### Prompt 485
+> [Pasted second CAPI apply output — still webhook TLS errors + v1beta2 conversion webhook failure + OACP apiGroup required error]
+
+Diagnosed three issues from the apply output: (1) capm3 webhook TLS cert still has old SANs (MCE service rename), (2) Cluster v1beta2 conversion webhook bug (missing group suffix in CRD lookup), (3) OACP v1alpha3 now requires apiGroup in machineTemplate.infrastructureRef.
+
+### Prompt 486
+> you really need to deal with the wrapping and indentation issue. this is horrible.
+
+Adjusted command formatting to shorter single-line commands.
+
+### Prompt 487
+> should we restart deployment after cleanup?
+
+Confirmed yes — delete the cert secret and restart the capm3 controller manager.
+
+### Prompt 488
+> do we need to ship any template changes?
+
+Yes — three corrections needed: revert Cluster/MachineDeployment v1beta2→v1beta1, add apiGroup to OACP infraRef, revert binder policy v1beta2→v1beta1.
+
+### Prompt 489
+> [Pasted Metal3Machine status still showing AssociateM3MetaDataFailed]
+
+Metal3Machine still failing — webhook TLS not yet fixed.
+
+### Prompt 490
+> [Pasted third CAPI apply output with same webhook TLS errors]
+
+Same webhook TLS cert issue persists.
+
+### Prompt 491
+> [Pasted cert secret deletion + controller restart output — successfully rolled out]
+
+User deleted mce-capm3-webhook-service-cert secret and restarted the controller. Rollout succeeded. Pending verification of new cert SANs.
+
+### Prompt 492
+> (continuation session)
+
+Shipped v3.24.5 (patch): reverted Cluster/MachineDeployment from v1beta2 back to v1beta1 (conversion webhook bug), added apiGroup to OACP v1alpha3 machineTemplate.infrastructureRef, reverted BMH binder policy Machine lookup to v1beta1. Updated all five version locations, changelogs, prompt.log.
