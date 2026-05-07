@@ -55,12 +55,15 @@ docs: https://github.com/openshift-assisted/cluster-api-provider-openshift-assis
 {%- set isKubevirt = (plugins | default({})).kubevirt is defined -%}
 {%- set bmIronic = (((plugins | default({})).baremetal | default({})).ironic | default({})).host | default({}) -%}
 {%- set enableDisconnected = cluster.disconnected is defined -%}
+{%- set disc = cluster.disconnected | default({}) -%}
+{%- set osImageHost = disc.osImageHost | default("") -%}
 {%- set hasMirrorRegistries = cluster.mirrors | default([]) | length > 0 -%}
 {%- set insecureMirrors = cluster.mirrors | default([]) | selectattr('insecure', 'defined') | selectattr('insecure') | list -%}
 {%- set generatedDiscoveryIgnitionOverride = "" -%}
 {%- if hasMirrorRegistries -%}
 {%- set generatedDiscoveryIgnitionOverride %}{% include "includes/disconnected-discovery-ignition-override.json.tpl" %}{% endset -%}
 {%- endif -%}
+{%- set sshKey = load_file(cluster.sshKeys|first) -%}
 {%- set controlCount = hosts.values() | selectattr('role', 'equalto', 'control') | list | length -%}
 {%- set workerCount  = hosts.values() | selectattr('role', 'equalto', 'worker')  | list | length -%}
 apiVersion: v1
@@ -138,7 +141,7 @@ items:
     openshiftAssistedConfigSpec:
       pullSecretRef:
         name: pullsecret-{{ cluster.name }}
-      sshAuthorizedKey: '{{load_file(cluster.sshKeys|first)|safe}}'
+      sshAuthorizedKey: '{{ sshKey }}'
       nodeRegistration:
         kubeletExtraLabels:
           - 'metal3.io/uuid="${METADATA_UUID}"'
@@ -154,7 +157,7 @@ items:
       baseDomain: {{ network.domain }}
       pullSecretRef:
         name: pullsecret-{{ cluster.name }}
-      sshAuthorizedKey: '{{load_file(cluster.sshKeys|first)|safe}}'
+      sshAuthorizedKey: '{{ sshKey }}'
     machineTemplate:
       infrastructureRef:
         apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
@@ -256,6 +259,7 @@ items:
         infrastructureRef:
           name: {{ cluster.name }}-worker
           apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+          apiGroup: infrastructure.cluster.x-k8s.io
           kind: Metal3MachineTemplate
 - kind: OpenshiftAssistedConfigTemplate
   apiVersion: bootstrap.cluster.x-k8s.io/v1alpha2
@@ -278,7 +282,7 @@ items:
             role: worker
         pullSecretRef:
           name: "pullsecret-{{ cluster.name }}"
-        sshAuthorizedKey: '{{load_file(cluster.sshKeys|first)|safe}}'{% endif %}{% for name,host in hosts.items() %}{% set shortname=name.split('.')[0] %}
+        sshAuthorizedKey: '{{ sshKey }}'{% endif %}{% for name,host in hosts.items() %}{% set shortname=name.split('.')[0] %}
 - kind: Secret
   apiVersion: v1
   metadata:
@@ -286,7 +290,7 @@ items:
     namespace: {{ cluster.name }}
   type: Opaque
   data:
-    nmstate: {% set nmstate %}{% include "includes/nmstate.config.yaml.tpl" %}{% endset -%}
+    nmstate: {% set nmstate %}{% set skipMacMapping=true %}{% include "includes/nmstate.config.yaml.tpl" %}{% endset -%}
      {{ nmstate | base64encode }}{% if host.bmc %}
 - kind: Secret
   apiVersion: v1

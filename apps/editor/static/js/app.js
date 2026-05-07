@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.24.5';
+let APP_VERSION = '3.24.6';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,15 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.24.6',
+    date: '2026-05-07',
+    changes: [
+      'CAPI template cleanup: osImageHost and skipMacMapping variables now set before their respective includes (eliminates undefined warnings; fixes wrong MAC-address ethernet-mapping output in provisioning nmstate secrets)',
+      'Worker MachineDeployment infrastructureRef now includes apiGroup: infrastructure.cluster.x-k8s.io (was missing, already present on control plane since v3.24.5)',
+      'sshKey extracted to single load_file() call in preamble, replacing 3 repeated inline calls'
+    ]
+  },
   {
     version: '3.24.5',
     date: '2026-05-01',

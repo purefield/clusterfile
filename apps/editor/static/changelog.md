@@ -1,5 +1,12 @@
 # Clusterfile Editor Changelog
 
+## 3.24.6
+- **CAPI template cleanup** — fixes undefined variable warnings and a wrong-output bug:
+  - `osImageHost` set before `os-images-sync.yaml.tpl` include (eliminates warning)
+  - `skipMacMapping=true` set before `nmstate.config.yaml.tpl` include in provisioning nmstate secrets (fixes wrong MAC-address ethernet-mapping output)
+  - `apiGroup` added to worker `MachineDeployment.infrastructureRef` (was missing, already present on control plane)
+  - `sshKey` extracted to single variable, replacing 3 repeated `load_file()` calls
+
 ## 3.24.5
 - **CAPI API version corrections** — Cluster and MachineDeployment reverted from `v1beta2` back to `v1beta1` (the v1beta2 conversion webhook has a bug). OpenshiftAssistedControlPlane stays at `v1alpha3` with the now-required `apiGroup` field added to `machineTemplate.infrastructureRef`. BMH binder policy Machine lookup reverted to `v1beta1` to match.
 

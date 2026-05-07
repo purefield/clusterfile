@@ -4583,3 +4583,13 @@ User deleted mce-capm3-webhook-service-cert secret and restarted the controller.
 > (continuation session)
 
 Shipped v3.24.5 (patch): reverted Cluster/MachineDeployment from v1beta2 back to v1beta1 (conversion webhook bug), added apiGroup to OACP v1alpha3 machineTemplate.infrastructureRef, reverted BMH binder policy Machine lookup to v1beta1. Updated all five version locations, changelogs, prompt.log.
+
+### Prompt 493
+> (continuation session — CAPI template cleanup and parent-repo collaboration)
+
+Debugged and fixed CAPI template warnings: osImageHost undefined, skipMacMapping undefined (causing wrong MAC-mapping output), missing worker apiGroup, repeated sshKey load_file calls. Coordinated with Codex via file-based protocol for parent-repo changes: webhook fix step, workflow files, NEXT-STEP.sh resolver, cert-manager direct ingress ownership, whereabouts typo. Verified rendered output locally: no warnings, no MAC mappings in provisioning nmstate, apiGroup present, sshKey consistent. 186 tests pass.
+
+### Prompt 494
+> ship it
+
+Shipped v3.24.6 (patch): CAPI template cleanup — osImageHost, skipMacMapping, worker apiGroup, sshKey extraction. Updated all five version locations, changelogs, prompt.log.
