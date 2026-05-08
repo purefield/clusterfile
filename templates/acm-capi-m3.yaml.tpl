@@ -75,7 +75,18 @@ items:
   apiVersion: v1
   metadata:
     name: {{ cluster.name }}
-  spec: {}
+  spec: {}{% for name,host in hosts.items() %}{% set shortname=name.split('.')[0] %}
+- kind: NMStateConfig
+  apiVersion: agent-install.openshift.io/v1beta1
+  metadata:
+    labels:
+      node: {{ shortname }}
+      role: {{ 'control' if host.role == 'control' else 'worker' }}
+    name: {{ shortname }}-nmstate
+    namespace: {{ cluster.name }}
+  spec:
+    config: {%- set nmstate %}{% include "includes/nmstate.yaml.tpl" %}{% endset %}
+{{ nmstate | indent(4,true) }}{% endfor %}
 - kind: ManagedCluster
   apiVersion: cluster.open-cluster-management.io/v1
   metadata:
@@ -303,17 +314,6 @@ items:
     labels:
       environment.metal3.io: baremetal
   type: Opaque{% endif %}
-- kind: NMStateConfig
-  apiVersion: agent-install.openshift.io/v1beta1
-  metadata:
-    labels:
-      node: {{ shortname }}
-      role: {{ 'control' if host.role == 'control' else 'worker' }}
-    name: {{ shortname }}-nmstate
-    namespace: {{ cluster.name }}
-  spec:
-    config: {%- set nmstate %}{% include "includes/nmstate.yaml.tpl" %}{% endset %}
-{{ nmstate | indent(4,true) }}
 - kind: BareMetalHost
   apiVersion: metal3.io/v1alpha1
   {%- set hasExplicitIgnitionOverride = host.ignitionConfigOverride is defined -%}

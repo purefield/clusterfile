@@ -5,6 +5,10 @@ All notable changes to this project are documented in this file.
 ## Unreleased
 - Tooling: `scripts/extract-doc-urls.py` walks all schemas and emits `schema/x-doc-urls.csv` (115 rows × 6 columns); `scripts/import-doc-urls.py` reads the CSV and applies non-empty `new_url` values back into the source schema files (with `--dry-run` and JSON validation). Sets up the docs.redhat.com html-single URL rewrite — fill `new_url` column then re-import.
 
+## v3.24.7 (2026-05-08)
+- **CAPI NMStateConfig race condition fix** — NMStateConfigs moved before Cluster/OACP in the rendered List so they exist in the API server before CAPI controllers create InfraEnvs. Previously, InfraEnvs were created with `nmstateCount=0` (ISOs had no network config) because `oc apply` hadn't created the NMStateConfigs yet when the controller queried for them.
+- **BMH binder policy namespace fix** — Policy, Placement, PlacementBinding, and ManagedClusterSetBinding moved from `{{ cluster.name }}` namespace to `open-cluster-management`. The ACM governance propagator owns managed cluster namespaces and deletes directly-created policies, so the binder policy was silently removed after every apply.
+
 ## v3.24.6 (2026-05-07)
 - **CAPI template cleanup** — fixes undefined variable warnings and a wrong-output bug in `acm-capi-m3.yaml.tpl`:
   - `osImageHost` variable set before `os-images-sync.yaml.tpl` include (eliminates `LoggingUndefined` warning)

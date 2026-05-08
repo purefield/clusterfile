@@ -4593,3 +4593,26 @@ Debugged and fixed CAPI template warnings: osImageHost undefined, skipMacMapping
 > ship it
 
 Shipped v3.24.6 (patch): CAPI template cleanup — osImageHost, skipMacMapping, worker apiGroup, sshKey extraction. Updated all five version locations, changelogs, prompt.log.
+
+### Prompt 495
+> I destroyed and recreated the cluster, changes should be durable
+
+### Prompt 496
+> next-step should only report, this must be durable fixes via templates only
+
+Debugged CAPI provisioning failure for ocp-cluster2: VMs boot but agents never register because nmstateCount=0 on all InfraEnvs. Root cause: NMStateConfigs appeared after Cluster/OACP in the rendered List — CAPI controllers create InfraEnvs before oc apply reaches NMStateConfigs. Also found binder policy was in cluster namespace where ACM governance propagator silently deletes it. Fixed both in templates:
+
+1. `templates/acm-capi-m3.yaml.tpl` — moved NMStateConfigs to early loop before Cluster/OACP so they exist before InfraEnv creation
+2. `templates/includes/capi-bmh-binder-policy.yaml.tpl` — moved Policy, Placement, PlacementBinding, ManagedClusterSetBinding to open-cluster-management namespace
+
+Also stripped NEXT-STEP.sh to report-only per user request: removed fix_infraenv_nmstate_race() and bind_bmh_infraenvs() action functions, kept all diagnostic sections.
+
+### Prompt 497
+> notes do not show any ip address in the virt console.
+
+Analyzed diagnostic output — confirmed nmstateCount: 0, BMH imageURL: NONE, binder policy MISSING. Template fixes address root causes; user needs to re-render and re-apply after shipping.
+
+### Prompt 498
+> ship it
+
+Shipping v3.24.7: fix NMStateConfig race condition + binder policy namespace.

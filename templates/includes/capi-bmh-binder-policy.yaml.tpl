@@ -15,7 +15,7 @@
   apiVersion: policy.open-cluster-management.io/v1
   metadata:
     name: bind-bmh-infraenvs-{{ cluster.name }}
-    namespace: {{ cluster.name }}
+    namespace: open-cluster-management
   spec:
     remediationAction: enforce
     disabled: false
@@ -55,7 +55,7 @@
   apiVersion: cluster.open-cluster-management.io/v1beta1
   metadata:
     name: bind-bmh-infraenvs-{{ cluster.name }}-pl
-    namespace: {{ cluster.name }}
+    namespace: open-cluster-management
   spec:
     predicates:
       - requiredClusterSelector:
@@ -68,7 +68,7 @@
   apiVersion: policy.open-cluster-management.io/v1
   metadata:
     name: bind-bmh-infraenvs-{{ cluster.name }}-pb
-    namespace: {{ cluster.name }}
+    namespace: open-cluster-management
   placementRef:
     apiGroup: cluster.open-cluster-management.io
     kind: Placement
@@ -81,6 +81,6 @@
   apiVersion: cluster.open-cluster-management.io/v1beta2
   metadata:
     name: default
-    namespace: {{ cluster.name }}
+    namespace: open-cluster-management
   spec:
     clusterSet: default

@@ -1,5 +1,9 @@
 # Clusterfile Editor Changelog
 
+## 3.24.7
+- **CAPI NMStateConfig race condition fix** — NMStateConfigs moved before Cluster/OACP in the rendered List so they exist before CAPI controllers create InfraEnvs (prevents nmstateCount=0 ISOs with no network config)
+- **BMH binder policy namespace fix** — Policy, Placement, PlacementBinding, ManagedClusterSetBinding moved from cluster namespace to `open-cluster-management` (ACM propagator was deleting them)
+
 ## 3.24.6
 - **CAPI template cleanup** — fixes undefined variable warnings and a wrong-output bug:
   - `osImageHost` set before `os-images-sync.yaml.tpl` include (eliminates warning)

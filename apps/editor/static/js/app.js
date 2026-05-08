@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.24.6';
+let APP_VERSION = '3.24.7';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,14 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.24.7',
+    date: '2026-05-08',
+    changes: [
+      'CAPI NMStateConfig race condition fix: NMStateConfigs now render before Cluster/OACP in the List so they exist in the API server before CAPI controllers create InfraEnvs — prevents nmstateCount=0 ISOs with no network config',
+      'BMH binder policy namespace fix: Policy, Placement, PlacementBinding, and ManagedClusterSetBinding moved from cluster namespace to open-cluster-management — ACM propagator was deleting them from the managed cluster namespace'
+    ]
+  },
   {
     version: '3.24.6',
     date: '2026-05-07',
