@@ -80,8 +80,6 @@ items:
 {%- set sockets = hm.sockets | default(1) -%}
 {%- set osDiskSize = hms.os | default(120) -%}
 {%- set dataDisks = hms.data | default([]) -%}
-{%- set ifname  = host.network.interfaces[0].name -%}
-{%- set macaddr = host.network.interfaces[0].macAddress -%}
 {%- set roleMap = kvmap[host.role] | default({}) -%}
 {%- set osClassLabel = roleMap.os | default("performance" if host.role == "control" else "default") -%}
 {%- set dataClassLabel = roleMap.data | default("performance") -%}
@@ -191,11 +189,11 @@ items:
               - disk:
                   bus: scsi
                 name: datadisk-{{ loop.index0 }}{% endfor %}
-            interfaces:
+            interfaces:{% for nic in host.network.interfaces %}
               - bridge: {}
-                macAddress: {{ macaddr }}
+                macAddress: {{ nic.macAddress }}
                 model: virtio
-                name: {{ ifname }}{% if enableTPM %}
+                name: {{ nic.name }}{% endfor %}{% if enableTPM %}
             tpm:
               persistent: true{% endif %}{% if enableTPM %}
           features:
@@ -213,10 +211,10 @@ items:
               memory: {{ memory }}Gi
               cpu: {{ cores * sockets }}
         evictionStrategy: None
-        networks:
+        networks:{% for nic in host.network.interfaces %}
           - multus:
               networkName: {{ netRef }}
-            name: {{ ifname }}
+            name: {{ nic.name }}{% endfor %}
         terminationGracePeriodSeconds: 180
         volumes:
           - name: rootdisk
