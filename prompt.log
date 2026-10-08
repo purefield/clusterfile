@@ -4710,3 +4710,12 @@ Documented the rendering contract on `hosts.<name>.network.interfaces` in the sc
 
 Edited as text rather than re-serialising the JSON, which would have reformatted twenty-three unrelated lines. Diff is one line. Schema still validates and all three real clusterfiles still render.
 
+### Prompt 513
+> we want this repo to be clean and we need to do a proper "ship it" the image did not get reloaded on the cluster and hence is not properly pushed. you have access do it.
+
+Verified the deployed editor is already serving the new templates, by rendering a real clusterfile through its `/api/render` endpoint rather than trusting the version string. `kubevirt-cluster.yaml.tpl` returned eighteen MAC addresses where the old template returned three, and `secondary-network-setup.yaml.tpl` no longer emitted the substituted range. `/healthz` reports 3.25.2 but only reflects APP_VERSION, so it cannot distinguish an image built from stale templates.
+
+Repo cleanup: removed the MCP team collaboration section from CLAUDE.md, which documented an agent system that no longer exists and pointed at two dead endpoints. It was a pure append, so nothing clusterfile specific was lost. Gitignored `.claude/`. Dropped an orphaned stash holding a prompt.log append for Prompt 232 while the log is at 512.
+
+Left `stash@{0}` alone. It is genuine disconnected and mirror template work explicitly paused for review, six months old, and it conflicts with current main.
+
