@@ -69,7 +69,7 @@ items:{%- set enabledFalse='{"enabled":false}' %}{% for network in network.secon
         "mtu": {{ network.mtu }},{% endif %}
         "cniVersion": "0.3.1",
         "ipam": { {%- if network.subnet == 'dhcp' %}
-           "type": "dhcp"{% else %}
+           "type": "dhcp"{% elif network.subnet is defined %}
            "type": "whereabouts",
            "range": "{{ network.subnet }}"{% endif %}
         }
