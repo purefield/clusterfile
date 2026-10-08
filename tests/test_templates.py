@@ -1068,6 +1068,49 @@ class TestKubevirtClusterTemplate:
         """Extract all PVCs from the rendered List."""
         return [item for item in result['items'] if item['kind'] == 'PersistentVolumeClaim']
 
+    def test_single_interface_yields_one_nic(self, template_env):
+        """The common single-NIC host is unchanged."""
+        data = self.kubevirt_cluster_data()
+
+        vm = self.get_vm(self.render_template(template_env, data))
+        devices = vm['spec']['template']['spec']['domain']['devices']
+
+        assert [i['name'] for i in devices['interfaces']] == ['eth0']
+        assert [n['name'] for n in vm['spec']['template']['spec']['networks']] == ['eth0']
+
+    def test_every_declared_interface_becomes_a_nic(self, template_env):
+        """A host declaring secondary ports gets a NIC for each one."""
+        data = self.kubevirt_cluster_data()
+        host = next(iter(data['hosts'].values()))
+        host['network']['interfaces'] = [
+            {'name': f'eth{n}', 'macAddress': f'00:1A:2B:3C:4D:{n:02X}'} for n in range(5)
+        ]
+
+        vm = self.get_vm(self.render_template(template_env, data))
+        devices = vm['spec']['template']['spec']['domain']['devices']
+        names = ['eth0', 'eth1', 'eth2', 'eth3', 'eth4']
+
+        assert [i['name'] for i in devices['interfaces']] == names
+        assert [i['macAddress'] for i in devices['interfaces']] == [
+            f'00:1A:2B:3C:4D:{n:02X}' for n in range(5)
+        ]
+
+    def test_every_nic_is_attached_to_a_network(self, template_env):
+        """Each NIC has a matching network entry, or the VM will not start."""
+        data = self.kubevirt_cluster_data()
+        host = next(iter(data['hosts'].values()))
+        host['network']['interfaces'] = [
+            {'name': f'eth{n}', 'macAddress': f'00:1A:2B:3C:4D:{n:02X}'} for n in range(5)
+        ]
+
+        vm = self.get_vm(self.render_template(template_env, data))
+        spec = vm['spec']['template']['spec']
+
+        nic_names = {i['name'] for i in spec['domain']['devices']['interfaces']}
+        net_names = {n['name'] for n in spec['networks']}
+
+        assert nic_names == net_names
+
     def get_pvcs_for_vm(self, result, vmname):
         """Extract PVCs matching a VM name (OS + data)."""
         return [pvc for pvc in self.get_pvcs(result)
@@ -4161,6 +4204,99 @@ class TestAcmDisconnectedTemplate:
         assert 'registries.conf' in cm['data']
         assert 'ca-bundle.crt' in cm['data']
         assert 'BEGIN CERTIFICATE' in cm['data']['ca-bundle.crt']
+
+
+class TestSecondaryNetworkSetupTemplate:
+    """Test secondary-network-setup.yaml.tpl bond, bridge and IPAM behavior."""
+
+    def render_template(self, env, data):
+        """Render secondary-network-setup template and parse YAML."""
+        template = env.get_template('secondary-network-setup.yaml.tpl')
+        return yaml.safe_load(template.render(data))
+
+    def _by_kind(self, result, kind):
+        return [i for i in result['items'] if i['kind'] == kind]
+
+    def test_bond_uses_all_declared_ports(self, template_env):
+        """A bond aggregates every port, not just the first."""
+        data = base_cluster_data()
+        data['network']['secondary'] = [
+            {'name': 'migration', 'bond': 'active-backup',
+             'ports': ['eth3', 'eth4'], 'subnet': '10.14.11.0/24'},
+        ]
+
+        nncp = self._by_kind(self.render_template(template_env, data),
+                             'NodeNetworkConfigurationPolicy')[0]
+        bond = nncp['spec']['desiredState']['interfaces'][0]
+
+        assert bond['type'] == 'bond'
+        assert bond['name'] == 'migration-bond'
+        assert bond['link-aggregation']['mode'] == 'active-backup'
+        assert bond['link-aggregation']['port'] == ['eth3', 'eth4']
+
+    @pytest.mark.xfail(reason="NAD is named for ports[0], not the bond. Renaming "
+                              "is a public contract change, pending review.",
+                       strict=True)
+    def test_bond_nad_named_for_bond_not_first_port(self, template_env):
+        """The attachment should be named after the bond, so it survives a port change."""
+        data = base_cluster_data()
+        data['network']['secondary'] = [
+            {'name': 'migration', 'bond': 'active-backup',
+             'ports': ['eth3', 'eth4'], 'subnet': '10.14.11.0/24'},
+        ]
+
+        nad = self._by_kind(self.render_template(template_env, data),
+                            'NetworkAttachmentDefinition')[0]
+
+        assert nad['metadata']['name'] == 'migration-bond-network'
+
+    def test_subnet_yields_whereabouts_ipam(self, template_env):
+        """A declared subnet drives whereabouts address management."""
+        data = base_cluster_data()
+        data['network']['secondary'] = [
+            {'name': 'migration', 'bond': 'active-backup',
+             'ports': ['eth3', 'eth4'], 'subnet': '10.14.11.0/24'},
+        ]
+
+        nad = self._by_kind(self.render_template(template_env, data),
+                            'NetworkAttachmentDefinition')[0]
+        ipam = json.loads(nad['spec']['config'])['ipam']
+
+        assert ipam['type'] == 'whereabouts'
+        assert ipam['range'] == '10.14.11.0/24'
+
+    @pytest.mark.xfail(reason="A link with no subnet still renders whereabouts on a "
+                              "substituted range. Behaviour change, pending review.",
+                       strict=True)
+    def test_no_subnet_yields_no_ipam(self, template_env):
+        """A plain L2 link should hand out no addresses on a range nobody declared."""
+        data = base_cluster_data()
+        data['network']['secondary'] = [
+            {'name': 'prod', 'type': 'linux-bridge', 'bond': 'active-backup',
+             'ports': ['eth1', 'eth2']},
+        ]
+
+        nad = self._by_kind(self.render_template(template_env, data),
+                            'NetworkAttachmentDefinition')[0]
+
+        assert json.loads(nad['spec']['config'])['ipam'] == {}
+
+    def test_bridge_on_bond_for_guest_tagged_traffic(self, template_env):
+        """A bridge over the bond lets guests carry their own VLAN tags."""
+        data = base_cluster_data()
+        data['network']['secondary'] = [
+            {'name': 'prod', 'type': 'linux-bridge', 'bond': 'active-backup',
+             'ports': ['eth1', 'eth2']},
+        ]
+
+        result = self.render_template(template_env, data)
+        interfaces = self._by_kind(result, 'NodeNetworkConfigurationPolicy')[0]['spec']['desiredState']['interfaces']
+        bridge = [i for i in interfaces if i['type'] == 'linux-bridge'][0]
+
+        assert bridge['name'] == 'br-prod-bond'
+        assert bridge['bridge']['port'][0]['name'] == 'prod-bond'
+        assert bridge['ipv4'] == {'enabled': False}
+
 
 
 if __name__ == '__main__':
