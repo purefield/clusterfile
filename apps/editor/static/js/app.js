@@ -109,7 +109,16 @@ function getTemplateIcon(category) {
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
   {
-    version: '3.25.1',
+    version: '3.25.2',
+    date: '2026-10-08',
+    changes: [
+      'Hosts with more than one network interface now get a virtual NIC per interface on KubeVirt clusters',
+      'Secondary networks with no subnet no longer hand out addresses from a placeholder range',
+      'Schema documents that a declared interface becomes a guest NIC'
+    ]
+  },
+  {
+    version: '3.25.2',
     date: '2026-07-17',
     changes: [
       'Updated editor logo/icon SVG',

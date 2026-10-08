@@ -1,7 +1,9 @@
 # Clusterfile Editor Changelog
 
 ## 3.25.2
-- Merge branch 'feature/document-interfaces-contract'
+- Hosts declaring more than one network interface now get a virtual NIC per interface on KubeVirt clusters, instead of only the first
+- Secondary networks with no subnet no longer hand out addresses from a placeholder range
+- Schema documents that a declared interface becomes a guest NIC, not just a host inventory record
 
 
 ## 3.25.1
