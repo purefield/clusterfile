@@ -6,3 +6,6 @@ cache/
 # Quay.io robot account credentials
 robot.quayio.creds
 
+
+# Local Claude Code tooling
+.claude/

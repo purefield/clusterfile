@@ -3,6 +3,7 @@
 All notable changes to this project are documented in this file.
 
 ## Unreleased
+- Repo: `.claude/` local editor tooling is gitignored so it stops surfacing as untracked in release preflight.
 
 ## v3.25.2 (2026-10-08)
 - Schema: `hosts.<name>.network.interfaces` now documents that every entry becomes a virtual NIC on a KubeVirt hosted cluster, not only a host inventory record. The field previously described only the inventory side, leaving the rendering contract implicit.
