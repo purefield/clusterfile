@@ -3,6 +3,7 @@
 All notable changes to this project are documented in this file.
 
 ## Unreleased
+- Schema: `hosts.<name>.network.interfaces` now documents that every entry becomes a virtual NIC on a KubeVirt hosted cluster, not only a host inventory record. The field previously described only the inventory side, leaving the rendering contract implicit.
 - Templates: `secondary-network-setup.yaml.tpl` no longer emits whereabouts IPAM for a secondary network that declares no `subnet`. A plain L2 link, such as a trunk whose guests tag themselves, previously received addresses from a substituted range that nobody declared.
 - Templates: `kubevirt-cluster.yaml.tpl` now renders a NIC and matching network entry for every `hosts.<name>.network.interfaces` entry instead of only the first, so hosts declaring secondary ports get the vNICs those ports need. Single-interface hosts render identically.
 - Tests: added coverage for kubevirt VM NIC rendering and for `secondary-network-setup.yaml.tpl` bond, bridge and IPAM behavior.

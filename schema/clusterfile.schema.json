@@ -1143,7 +1143,7 @@
                     "additionalProperties": true
                   },
                   "minItems": 1,
-                  "description": "Physical network interfaces on the host.",
+                  "description": "Physical network interfaces on the host. Every entry is declared to the host inventory, and on a KubeVirt hosted cluster every entry also becomes a virtual NIC on the guest. Declare only the interfaces the host should actually have.",
                   "x-doc-url": "https://docs.openshift.com/container-platform/4.21/networking/k8s_nmstate/k8s-nmstate-about-the-k8s-nmstate-operator.html"
                 },
                 "primary": {
