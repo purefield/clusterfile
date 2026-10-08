@@ -4696,3 +4696,17 @@ Verified by render against the reference `vlan-trunk` NetworkAttachmentDefinitio
 
 The companion defect, a bond's NetworkAttachmentDefinition being named for `ports[0]` rather than the bond, remains recorded as a strict xfail. Renaming it is a public contract change and is left for an explicit decision.
 
+### Prompt 511
+> do the check and report
+
+Completed the blast radius check that an earlier mistake had interrupted, using a non-mutating method: the pre-change template was extracted with `git show <rev>:<path>` rather than stashing. Rendered all six KubeVirt consuming clusterfiles through both template versions. Five produced byte-identical output; only the clusterfile authored for multiple NICs changed. The two other multi-interface clusterfiles do not use the KubeVirt plugin and never reach this template.
+
+Recorded a process failure: using `git stash` as scratch in a shared repo popped an unrelated pre-existing stash and conflicted across five files. HEAD, both stashes and all tracked files were recovered intact.
+
+### Prompt 512
+> ok, ship it
+
+Documented the rendering contract on `hosts.<name>.network.interfaces` in the schema. The description covered only the host inventory, so a consumer declaring extra interfaces to describe host wiring had no way to know a KubeVirt cluster would also give the guest a NIC per entry. That silence is what made the behaviour change a latent hazard, even though no current consumer is affected.
+
+Edited as text rather than re-serialising the JSON, which would have reformatted twenty-three unrelated lines. Diff is one line. Schema still validates and all three real clusterfiles still render.
+
