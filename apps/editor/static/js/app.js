@@ -118,7 +118,7 @@ const CHANGELOG = [
     ]
   },
   {
-    version: '3.25.2',
+    version: '3.25.1',
     date: '2026-07-17',
     changes: [
       'Updated editor logo/icon SVG',
