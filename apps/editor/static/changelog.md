@@ -1,5 +1,9 @@
 # Clusterfile Editor Changelog
 
+## 3.25.2
+- Merge branch 'feature/document-interfaces-contract'
+
+
 ## 3.25.1
 - Updated editor logo/icon SVG
 - Added quay.io robot account credentials to .gitignore
