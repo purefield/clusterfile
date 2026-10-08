@@ -4265,11 +4265,8 @@ class TestSecondaryNetworkSetupTemplate:
         assert ipam['type'] == 'whereabouts'
         assert ipam['range'] == '10.14.11.0/24'
 
-    @pytest.mark.xfail(reason="A link with no subnet still renders whereabouts on a "
-                              "substituted range. Behaviour change, pending review.",
-                       strict=True)
     def test_no_subnet_yields_no_ipam(self, template_env):
-        """A plain L2 link should hand out no addresses on a range nobody declared."""
+        """A plain L2 link hands out no addresses on a range nobody declared."""
         data = base_cluster_data()
         data['network']['secondary'] = [
             {'name': 'prod', 'type': 'linux-bridge', 'bond': 'active-backup',

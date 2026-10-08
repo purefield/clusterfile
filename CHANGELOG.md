@@ -3,6 +3,7 @@
 All notable changes to this project are documented in this file.
 
 ## Unreleased
+- Templates: `secondary-network-setup.yaml.tpl` no longer emits whereabouts IPAM for a secondary network that declares no `subnet`. A plain L2 link, such as a trunk whose guests tag themselves, previously received addresses from a substituted range that nobody declared.
 - Templates: `kubevirt-cluster.yaml.tpl` now renders a NIC and matching network entry for every `hosts.<name>.network.interfaces` entry instead of only the first, so hosts declaring secondary ports get the vNICs those ports need. Single-interface hosts render identically.
 - Tests: added coverage for kubevirt VM NIC rendering and for `secondary-network-setup.yaml.tpl` bond, bridge and IPAM behavior.
 - Tooling: `scripts/extract-doc-urls.py` walks all schemas and emits `schema/x-doc-urls.csv` (115 rows × 6 columns); `scripts/import-doc-urls.py` reads the CSV and applies non-empty `new_url` values back into the source schema files (with `--dry-run` and JSON validation). Sets up the docs.redhat.com html-single URL rewrite — fill `new_url` column then re-import.
