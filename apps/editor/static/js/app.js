@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.25.1';
+let APP_VERSION = '3.25.3';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,14 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.25.3',
+    date: '2026-10-23',
+    changes: [
+      'Operator defaults target OpenShift 4.22: LVM policies follow the cluster minor (stable-4.22) instead of a non-existent "stable" channel',
+      'ACM defaults to release-2.17, and cluster image sets track backplane-2.17'
+    ]
+  },
   {
     version: '3.25.2',
     date: '2026-10-08',

@@ -4719,3 +4719,18 @@ Repo cleanup: removed the MCP team collaboration section from CLAUDE.md, which d
 
 Left `stash@{0}` alone. It is genuine disconnected and mirror template work explicitly paused for review, six months old, and it conflicts with current main.
 
+
+### Prompt 514
+> review our operators for versions, we need to be current and not have legacy version configured / Should all be geared for 4.22
+
+Reviewed operator channels against the live virt and ACM hub catalogs (both on OpenShift 4.22, ACM 2.17). The LVM policy template defaulted to `stable`, which is not an LVMS channel, while the LVM manifests template already derived `stable-<cluster minor>`; the policy now uses the same derivation. ACM defaults moved from release-2.15 (manifests) / release-2.14 (schema, imageset branch) to release-2.17. ODF and LVM READMEs and schemas now describe the derived default instead of stale 4.18 examples.
+
+### Prompt 515
+> you can commit to clusterfile I believe
+
+Committed the plugin changes on branch `chore/operator-channels-4.22` (3de7993). Not pushed.
+
+### Prompt 516
+> go ahead and follow the release steps in clusterfile.
+
+Shipped v3.25.3 following the ship-it skill (versioned editor release, run manually because `clusterfile-editor.sh release` opens an interactive editor and refuses to tag with the untracked local `IMPROVEMENT-IDEAS.md`). Updated `test_acm_standalone_defaults` to the release-2.17 default; tests: 195 passed, 1 xfailed. Verified by real render: `virt.ola.clusterfile` through `acm-ztp.yaml.tpl` now emits the lvms-operator policy subscription on `stable-4.22` (was `stable`); `ocp-acm.clusterfile` with ACM enabled renders `release-2.17` and `backplane-2.17`, and `backplane-2.17` exists in stolostron/acm-hive-openshift-releases. Tagged the feature `operator-channels-4.22`, merged with --no-ff to main, synced all five version locations (app.js `APP_VERSION` was stale at 3.25.1), committed `Release v3.25.3`, tagged `v3.25.3`, pushed main and tags, built and pushed `quay.io/dds/clusterfile-editor:v3.25.3` and `:latest`.

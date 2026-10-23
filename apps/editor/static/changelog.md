@@ -1,5 +1,10 @@
 # Clusterfile Editor Changelog
 
+## 3.25.3
+- LVM operator policies now follow the cluster's OpenShift minor version (stable-4.22 on 4.22) instead of defaulting to "stable", which is not an LVMS channel
+- ACM defaults to release-2.17, and cluster image sets track the backplane-2.17 branch
+- ODF and LVM docs describe the stable-<cluster minor> default instead of stale 4.18 examples
+
 ## 3.25.2
 - Hosts declaring more than one network interface now get a virtual NIC per interface on KubeVirt clusters, instead of only the first
 - Secondary networks with no subnet no longer hand out addresses from a placeholder range

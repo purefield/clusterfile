@@ -3,6 +3,11 @@
 All notable changes to this project are documented in this file.
 
 ## Unreleased
+
+## v3.25.3 (2026-10-23)
+- Plugins: the LVM policy derives its channel from `cluster.version` (`stable-<minor>`), matching the LVM manifests template. It previously defaulted to `stable`, which is not an LVMS channel. Tag `operator-channels-4.22`.
+- Plugins: ACM defaults to `release-2.17`; `acm-clusterimagesets-sub.yaml.tpl` follows with `backplane-2.17`. Tag `operator-channels-4.22`.
+- Docs: ODF and LVM plugin READMEs and schemas describe the `stable-<cluster minor>` default instead of stale 4.18 examples.
 - Repo: `.claude/` local editor tooling is gitignored so it stops surfacing as untracked in release preflight.
 
 ## v3.25.2 (2026-10-08)
