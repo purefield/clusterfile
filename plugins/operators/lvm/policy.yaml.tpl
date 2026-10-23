@@ -1,5 +1,6 @@
 {%- set lvm = plugins.operators.lvm -%}
 {%- set lvmEnabled = lvm.enabled | default(true) -%}
+{%- set lvmChannel = lvm.channel | default("stable-" + cluster.version.split(".")[:2] | join(".")) -%}
 {%- if lvmEnabled %}
 - kind: Policy
   apiVersion: policy.open-cluster-management.io/v1
@@ -47,7 +48,7 @@
                     name: lvms-operator
                     namespace: openshift-storage
                   spec:
-                    channel: {{ lvm.channel | default("stable") }}
+                    channel: {{ lvmChannel }}
                     installPlanApproval: {{ lvm.approval | default("Automatic") }}
                     name: lvms-operator
                     source: {{ lvm.source | default("redhat-operators") }}

@@ -29,7 +29,7 @@ docs: https://github.com/stolostron/acm-hive-openshift-releases/tree/backplane-2
 {%- set operators = plugins.operators | default({}) -%}
 {%- set acm = operators.acm | default({}) -%}
 {%- set channel = cluster.channel | default("fast", true) -%}
-{%- set imageSetBranch = acm.channel | default("release-2.14", true) | replace("release-", "backplane-") -%}
+{%- set imageSetBranch = acm.channel | default("release-2.17", true) | replace("release-", "backplane-") -%}
 apiVersion: v1
 kind: List
 metadata:

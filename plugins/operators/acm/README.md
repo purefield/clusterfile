@@ -7,7 +7,7 @@ Sets up a full ACM hub ready for ZTP and CAPI deployments. Installs the operator
 ```yaml
 plugins:
   operators:
-    acm: {}    # All defaults: release-2.14 channel, High availability
+    acm: {}    # All defaults: release-2.17 channel, High availability
 ```
 
 ## What gets installed
@@ -26,7 +26,7 @@ plugins:
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `enabled` | bool | `true` | Set `false` to skip installation |
-| `channel` | string | `release-2.14` | OLM subscription channel |
+| `channel` | string | `release-2.17` | OLM subscription channel |
 | `approval` | string | `Automatic` | InstallPlan approval: `Automatic` or `Manual` |
 | `source` | string | `redhat-operators` | OLM CatalogSource name |
 
@@ -102,7 +102,7 @@ plugins:
 plugins:
   operators:
     acm:
-      channel: release-2.13
+      channel: release-2.16
       source: my-custom-catalog
       approval: Manual
 ```

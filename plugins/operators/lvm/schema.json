@@ -14,7 +14,7 @@
       "title": "Channel",
       "type": "string",
       "default": "stable",
-      "description": "OLM subscription channel (e.g. stable, stable-4.18).",
+      "description": "OLM subscription channel (e.g. stable-4.22); defaults to stable-<cluster.version minor>.",
       "x-doc-url": "https://docs.openshift.com/container-platform/4.21/storage/persistent_storage/persistent_storage_local/persistent-storage-using-lvms.html#install-lvms-operator-cli_logical-volume-manager-storage"
     },
     "approval": {

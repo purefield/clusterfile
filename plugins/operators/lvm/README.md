@@ -24,7 +24,7 @@ plugins:
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `enabled` | bool | `true` | Set `false` to skip installation |
-| `channel` | string | `stable` | OLM subscription channel (e.g. `stable`, `stable-4.18`) |
+| `channel` | string | `stable-<cluster minor>` | OLM subscription channel (e.g. `stable-4.22`) |
 | `approval` | string | `Automatic` | InstallPlan approval: `Automatic` or `Manual` |
 | `source` | string | `redhat-operators` | OLM CatalogSource name |
 | `deviceClasses` | array | *see below* | LVM volume group device class configurations |
@@ -103,7 +103,7 @@ plugins:
 plugins:
   operators:
     lvm:
-      channel: stable-4.18
+      channel: stable-4.22
       source: my-custom-catalog
       approval: Manual
 ```

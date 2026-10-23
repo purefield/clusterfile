@@ -33,7 +33,7 @@ metadata:
   name: acm-operator-subscription
   namespace: open-cluster-management
 spec:
-  channel: {{ acm.channel | default("release-2.15") }}
+  channel: {{ acm.channel | default("release-2.17") }}
   installPlanApproval: {{ acm.approval | default("Automatic") }}
   name: advanced-cluster-management
   source: {{ acm.source | default("redhat-operators") }}
