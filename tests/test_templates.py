@@ -2816,7 +2816,7 @@ class TestAcmOperator:
         assert 'Provisioning' in kinds
 
         sub = next(d for d in docs if d['kind'] == 'Subscription' and d['metadata']['name'] == 'acm-operator-subscription')
-        assert sub['spec']['channel'] == 'release-2.15'
+        assert sub['spec']['channel'] == 'release-2.17'
         assert sub['spec']['name'] == 'advanced-cluster-management'
 
         mch = next(d for d in docs if d['kind'] == 'MultiClusterHub')
