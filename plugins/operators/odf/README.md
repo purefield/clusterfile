@@ -7,7 +7,7 @@ Ceph-based distributed storage for HA clusters with 3+ nodes and data disks. Pro
 ```yaml
 plugins:
   operators:
-    odf: {}    # All defaults: stable-4.18 channel, 3-replica StorageCluster
+    odf: {}    # All defaults: stable-<cluster minor> channel, 3-replica StorageCluster
 ```
 
 ## What gets installed
@@ -25,7 +25,7 @@ plugins:
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `enabled` | bool | `true` | Set `false` to skip installation |
-| `channel` | string | `stable-4.18` | OLM subscription channel |
+| `channel` | string | `stable-<cluster minor>` | OLM subscription channel |
 | `approval` | string | `Automatic` | InstallPlan approval: `Automatic` or `Manual` |
 | `source` | string | `redhat-operators` | OLM CatalogSource name |
 | `consolePlugin` | bool | `true` | Enable ODF console plugin |
@@ -79,7 +79,7 @@ Creates a 3-replica StorageCluster with 1Ti devices using the default StorageCla
 plugins:
   operators:
     odf:
-      channel: stable-4.19
+      channel: stable-4.22
       storageCluster:
         name: my-storage
         storageDeviceSets:
@@ -105,7 +105,7 @@ plugins:
 plugins:
   operators:
     odf:
-      channel: stable-4.18
+      channel: stable-4.22
       source: my-custom-catalog
       approval: Manual
 ```

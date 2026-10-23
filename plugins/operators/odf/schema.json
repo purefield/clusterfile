@@ -13,8 +13,8 @@
     "channel": {
       "title": "Channel",
       "type": "string",
-      "default": "stable-4.18",
-      "description": "OLM subscription channel. Version-pinned (e.g. stable-4.18, stable-4.19).",
+      "default": "stable-4.22",
+      "description": "OLM subscription channel. Version-pinned (e.g. stable-4.21, stable-4.22); defaults to stable-<cluster.version minor>.",
       "x-doc-url": "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.18/html/deploying_openshift_data_foundation_using_bare_metal_infrastructure/deploy-using-local-storage-devices-bm"
     },
     "approval": {
