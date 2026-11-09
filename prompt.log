@@ -4744,3 +4744,8 @@ Planned, then implemented on branch `feature/root-disk-partition`: `cluster.root
 > show me an example diff of a clusterfile and rendered template
 
 Rendered `virt.ola.clusterfile` through `acm-ztp.yaml.tpl` with and without `rootDisk.sizeGiB: 120` and showed both diffs: the clusterfile gains two lines; the render gains one MachineConfig entry in the existing `extraclustermanifests` ConfigMap and nothing else.
+
+### Prompt 519
+> it would make way more sense to follow our pattern how we do global networking configuration
+
+Moved the option from `cluster.rootDisk` to a new top-level `storage` section, mirroring `network` (cluster-wide) vs `hosts.<name>.network` (per host): `storage.os.{sizeGiB, partitionLabel}` sets the layout for every node, while `hosts.<name>.storage.os` still picks the disk. Schema, include, acm-ztp, install-config, tests and the LVM plugin description updated; the editor gains a Storage sidebar entry (its form is schema-driven). Verified: 203 passed, 1 xfailed; `virt.ola.clusterfile` with `storage.os.sizeGiB: 120` renders and validates (`startMiB: 122880`); unset, the render is identical to main; `sizeGiB: 10` is rejected. Editor run from source with a headless browser: the Storage section renders OS Disk Layout with both fields, no page errors (`run-dev.sh` lacks `PLUGINS_DIR`, so the schema endpoint fails when run from source -- noted, not fixed).
