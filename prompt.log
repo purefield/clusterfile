@@ -4734,3 +4734,13 @@ Committed the plugin changes on branch `chore/operator-channels-4.22` (3de7993).
 > go ahead and follow the release steps in clusterfile.
 
 Shipped v3.25.3 following the ship-it skill (versioned editor release, run manually because `clusterfile-editor.sh release` opens an interactive editor and refuses to tag with the untracked local `IMPROVEMENT-IDEAS.md`). Updated `test_acm_standalone_defaults` to the release-2.17 default; tests: 195 passed, 1 xfailed. Verified by real render: `virt.ola.clusterfile` through `acm-ztp.yaml.tpl` now emits the lvms-operator policy subscription on `stable-4.22` (was `stable`); `ocp-acm.clusterfile` with ACM enabled renders `release-2.17` and `backplane-2.17`, and `backplane-2.17` exists in stolostron/acm-hive-openshift-releases. Tagged the feature `operator-channels-4.22`, merged with --no-ff to main, synced all five version locations (app.js `APP_VERSION` was stale at 3.25.1), committed `Release v3.25.3`, tagged `v3.25.3`, pushed main and tags, built and pushed `quay.io/dds/clusterfile-editor:v3.25.3` and `:latest`.
+
+### Prompt 517
+> https://coreos.github.io/butane/config-openshift-v4_22/ can we add to our clusterfile a way to leave space on the coreos root disk? Goal is to allow for future LVM utilization of the nvme unused space
+
+Planned, then implemented on branch `feature/root-disk-partition`: `cluster.rootDisk.sizeGiB` (minimum 25) and optional `partitionLabel` (default `lvmstorage`). New include `includes/root-disk-partition.yaml.tpl` renders an ignition 3.4.0 MachineConfig per pool (master, plus worker when workers exist) that adds partition 5 on `coreos-boot-disk`, starting at the root size and taking the rest of the disk, unformatted. acm-ztp puts it in `extraclustermanifests`; install-config emits it as `openshift/` documents for agent installs. Factored the duplicated acm-ztp manifest gate into `hasExtraManifests`. LVM plugin schema description gains the by-partlabel example. Tests: 8 new; 203 passed, 1 xfailed (195 before). Verified by real render of `virt.ola.clusterfile`: with `rootDisk.sizeGiB: 120` the ConfigMap gains `98-master-root-disk-partition.yaml` (`startMiB: 122880`); with it unset the render is byte-identical to before; `sizeGiB: 10` fails schema validation.
+
+### Prompt 518
+> show me an example diff of a clusterfile and rendered template
+
+Rendered `virt.ola.clusterfile` through `acm-ztp.yaml.tpl` with and without `rootDisk.sizeGiB: 120` and showed both diffs: the clusterfile gains two lines; the render gains one MachineConfig entry in the existing `extraclustermanifests` ConfigMap and nothing else.
