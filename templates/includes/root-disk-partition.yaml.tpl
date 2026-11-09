@@ -1,4 +1,4 @@
-{%- set rootDisk = cluster.rootDisk -%}
+{%- set osDisk = storage.os -%}
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
@@ -14,7 +14,7 @@ spec:
         - device: /dev/disk/by-id/coreos-boot-disk
           wipeTable: false
           partitions:
-            - label: {{ rootDisk.partitionLabel | default("lvmstorage", true) }}
+            - label: {{ osDisk.partitionLabel | default("lvmstorage", true) }}
               number: 5
-              startMiB: {{ (rootDisk.sizeGiB * 1024) | int }}
+              startMiB: {{ (osDisk.sizeGiB * 1024) | int }}
               sizeMiB: 0

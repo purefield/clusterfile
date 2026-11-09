@@ -490,30 +490,6 @@
           "description": "Enable LUKS disk encryption with TPM 2.0 on the provisioned cluster. On virtual platforms (kubevirt), a persistent vTPM device is automatically added to VMs.",
           "x-doc-url": "https://docs.openshift.com/container-platform/4.21/installing/install_config/installing-customizing.html#installation-special-config-encrypt-disk_installing-customizing"
         },
-        "rootDisk": {
-          "title": "Root Disk Size",
-          "x-group": "Advanced",
-          "x-group-collapsed": true,
-          "type": "object",
-          "description": "Cap the CoreOS root partition at install time and give the rest of the boot disk to an empty partition for LVM (e.g. an LVMS device class with path /dev/disk/by-partlabel/lvmstorage). Install time only \u2014 nodes already installed keep their full-size root. Rendered for the agent and acm-ztp install methods; not for capi, whose manifests are applied after install.",
-          "properties": {
-            "sizeGiB": {
-              "type": "integer",
-              "minimum": 25,
-              "description": "Root partition size in GiB; the LVM partition starts here. Red Hat recommends at least 25000 MiB; 120 or more leaves room for images and logs.",
-              "examples": [120]
-            },
-            "partitionLabel": {
-              "type": "string",
-              "default": "lvmstorage",
-              "pattern": "^[A-Za-z0-9_-]{1,36}$",
-              "description": "GPT partition label of the reserved partition, exposed as /dev/disk/by-partlabel/<label>."
-            }
-          },
-          "required": ["sizeGiB"],
-          "additionalProperties": false,
-          "x-doc-url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/installing_on_bare_metal/user-provisioned-infrastructure#installation-user-infra-machines-advanced-disk_installing-bare-metal"
-        },
         "clusterType": {
           "title": "Cluster Type",
           "x-group": "Basics",
@@ -1029,6 +1005,36 @@
       "additionalProperties": true,
       "description": "Network configuration for cluster and node networking.",
       "x-doc-url": "https://docs.openshift.com/container-platform/4.21/installing/installing_bare_metal/installing-bare-metal.html#installation-network-user-infra_installing-bare-metal"
+    },
+    "storage": {
+      "title": "Storage",
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Cluster-wide disk layout, the storage counterpart of network. Which disk each host installs to stays per host, under hosts.<name>.storage.os.",
+      "properties": {
+        "os": {
+          "title": "OS Disk Layout",
+          "type": "object",
+          "description": "Cap the CoreOS root partition at install time and give the rest of the boot disk to an empty partition for LVM (e.g. an LVMS device class with path /dev/disk/by-partlabel/lvmstorage). Install time only \u2014 nodes already installed keep their full-size root. Rendered for the agent and acm-ztp install methods; not for capi, whose manifests are applied after install.",
+          "properties": {
+            "sizeGiB": {
+              "type": "integer",
+              "minimum": 25,
+              "description": "Root partition size in GiB; the LVM partition starts here. Red Hat recommends at least 25000 MiB; 120 or more leaves room for images and logs.",
+              "examples": [120]
+            },
+            "partitionLabel": {
+              "type": "string",
+              "default": "lvmstorage",
+              "pattern": "^[A-Za-z0-9_-]{1,36}$",
+              "description": "GPT partition label of the reserved partition, exposed as /dev/disk/by-partlabel/<label>."
+            }
+          },
+          "required": ["sizeGiB"],
+          "additionalProperties": false,
+          "x-doc-url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/installing_on_bare_metal/user-provisioned-infrastructure#installation-user-infra-machines-advanced-disk_installing-bare-metal"
+        }
+      }
     },
     "hosts": {
       "title": "Hosts",
