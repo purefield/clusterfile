@@ -137,7 +137,10 @@ spec:
       - {{ location }}{% endfor %}{% endfor %}{% endif %}{% if isKubevirt %}{%- set ssdUdev %}{% include "includes/kubevirt-ssd-udev.yaml.tpl" %}{% endset %}
 ---
 # Place in openshift/ directory for ABI/IPI — forces virtual disks to report as SSD
-{{ ssdUdev }}{% endif %}{% if (plugins | default({})).operators is defined %}
+{{ ssdUdev }}{% endif %}{% if cluster.rootDisk is defined and cluster.rootDisk.sizeGiB is defined %}{% for rootDiskRole in ['master'] + (['worker'] if workerCount > 0 else []) %}{%- set rootDiskManifest %}{% include "includes/root-disk-partition.yaml.tpl" %}{% endset %}
+---
+# Place in openshift/ directory for ABI/IPI — caps the root partition, rest of the boot disk for LVM
+{{ rootDiskManifest }}{% endfor %}{% endif %}{% if (plugins | default({})).operators is defined %}
 {%- set ops = plugins.operators -%}
 {%- for op_name, op_config in ops.items() if op_config is mapping and op_config.enabled | default(true) %}{%- set operatorManifests %}{% include "operators/" ~ op_name ~ "/manifests.yaml.tpl" ignore missing %}{% endset %}
 {{ operatorManifests }}{% endfor -%}{% endif %}
