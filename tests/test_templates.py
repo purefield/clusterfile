@@ -376,7 +376,7 @@ class TestInstallConfigTemplate:
     def test_root_disk_partition_agent_documents(self, template_env):
         """The agent path emits one root-disk MachineConfig per pool for the openshift/ directory."""
         data = base_cluster_data()
-        data['cluster']['rootDisk'] = {'sizeGiB': 120}
+        data['storage'] = {'os': {'sizeGiB': 120}}
         template = template_env.get_template('install-config.yaml.tpl')
         docs = [d for d in yaml.safe_load_all(template.render(data)) if d]
         mcs = {d['metadata']['name']: d for d in docs if d.get('kind') == 'MachineConfig'}
@@ -393,7 +393,7 @@ class TestInstallConfigTemplate:
         """sizeGiB is required and at least 25; unknown keys are rejected."""
         import json, jsonschema
         schema_path = os.path.join(os.path.dirname(__file__), '..', 'schema', 'clusterfile.schema.json')
-        sub = json.load(open(schema_path))['properties']['cluster']['properties']['rootDisk']
+        sub = json.load(open(schema_path))['properties']['storage']['properties']['os']
         jsonschema.validate({'sizeGiB': 120}, sub)
         jsonschema.validate({'sizeGiB': 25, 'partitionLabel': 'lvmstorage'}, sub)
         for bad in ({'sizeGiB': 10}, {}, {'sizeGiB': 120, 'size': 1}, {'sizeGiB': 120, 'partitionLabel': 'has space'}):
@@ -1487,7 +1487,7 @@ class TestAcmZtpTemplate:
         assert 'tpm2: true' in cm['data']['99-tpm-disk-encryption.yaml']
 
     def test_root_disk_unset_adds_nothing(self, template_env):
-        """Without cluster.rootDisk there is no root-disk MachineConfig and no extra ConfigMap."""
+        """Without storage.os there is no root-disk MachineConfig and no extra ConfigMap."""
         data = self.acm_ztp_data(platform='baremetal')
         result = self.render_template(template_env, data)
         assert self.get_configmap(result, 'extraclustermanifests') is None
@@ -1495,9 +1495,9 @@ class TestAcmZtpTemplate:
         assert 'manifestsConfigMapRef' not in aci['spec']
 
     def test_root_disk_partition_master(self, template_env):
-        """cluster.rootDisk caps root and reserves the rest of the boot disk as partition 5."""
+        """storage.os caps root and reserves the rest of the boot disk as partition 5."""
         data = self.acm_ztp_data(platform='baremetal')
-        data['cluster']['rootDisk'] = {'sizeGiB': 120}
+        data['storage'] = {'os': {'sizeGiB': 120}}
         result = self.render_template(template_env, data)
 
         aci = [i for i in result['items'] if i['kind'] == 'AgentClusterInstall'][0]
@@ -1514,7 +1514,7 @@ class TestAcmZtpTemplate:
 
     def test_root_disk_partition_custom_label(self, template_env):
         data = self.acm_ztp_data(platform='baremetal')
-        data['cluster']['rootDisk'] = {'sizeGiB': 200, 'partitionLabel': 'nvme-lvm'}
+        data['storage'] = {'os': {'sizeGiB': 200, 'partitionLabel': 'nvme-lvm'}}
         cm = self.get_configmap(self.render_template(template_env, data), 'extraclustermanifests')
         part = yaml.safe_load(cm['data']['98-master-root-disk-partition.yaml'])['spec']['config']['storage']['disks'][0]['partitions'][0]
         assert part['label'] == 'nvme-lvm'
@@ -1528,7 +1528,7 @@ class TestAcmZtpTemplate:
         worker['role'] = 'worker'
         worker['network']['primary']['address'] = '10.0.0.9'
         data['hosts']['worker1.ztp-test.example.com'] = worker
-        data['cluster']['rootDisk'] = {'sizeGiB': 120}
+        data['storage'] = {'os': {'sizeGiB': 120}}
         cm = self.get_configmap(self.render_template(template_env, data), 'extraclustermanifests')
         mc = yaml.safe_load(cm['data']['98-worker-root-disk-partition.yaml'])
         assert mc['metadata']['labels']['machineconfiguration.openshift.io/role'] == 'worker'
@@ -1537,7 +1537,7 @@ class TestAcmZtpTemplate:
     def test_root_disk_partition_with_tpm(self, template_env):
         """Root-disk partitioning and TPM encryption coexist in one ConfigMap."""
         data = self.acm_ztp_data(platform='baremetal', tpm=True)
-        data['cluster']['rootDisk'] = {'sizeGiB': 120}
+        data['storage'] = {'os': {'sizeGiB': 120}}
         cm = self.get_configmap(self.render_template(template_env, data), 'extraclustermanifests')
         assert '99-tpm-disk-encryption.yaml' in cm['data']
         assert '98-master-root-disk-partition.yaml' in cm['data']

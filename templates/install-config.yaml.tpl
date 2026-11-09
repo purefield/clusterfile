@@ -137,7 +137,7 @@ spec:
       - {{ location }}{% endfor %}{% endfor %}{% endif %}{% if isKubevirt %}{%- set ssdUdev %}{% include "includes/kubevirt-ssd-udev.yaml.tpl" %}{% endset %}
 ---
 # Place in openshift/ directory for ABI/IPI — forces virtual disks to report as SSD
-{{ ssdUdev }}{% endif %}{% if cluster.rootDisk is defined and cluster.rootDisk.sizeGiB is defined %}{% for rootDiskRole in ['master'] + (['worker'] if workerCount > 0 else []) %}{%- set rootDiskManifest %}{% include "includes/root-disk-partition.yaml.tpl" %}{% endset %}
+{{ ssdUdev }}{% endif %}{% if storage is defined and storage.os is defined and storage.os.sizeGiB is defined %}{% for rootDiskRole in ['master'] + (['worker'] if workerCount > 0 else []) %}{%- set rootDiskManifest %}{% include "includes/root-disk-partition.yaml.tpl" %}{% endset %}
 ---
 # Place in openshift/ directory for ABI/IPI — caps the root partition, rest of the boot disk for LVM
 {{ rootDiskManifest }}{% endfor %}{% endif %}{% if (plugins | default({})).operators is defined %}

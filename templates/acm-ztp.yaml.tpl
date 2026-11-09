@@ -37,7 +37,7 @@ docs: https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_manageme
 {%- set osImageHost = disc.osImageHost | default("") -%}
 {%- set hasMirrorRegistries = cluster.mirrors | default([]) | length > 0 -%}
 {%- set insecureMirrors = cluster.mirrors | default([]) | selectattr('insecure', 'defined') | selectattr('insecure') | list -%}
-{%- set enableRootDisk = cluster.rootDisk is defined and cluster.rootDisk.sizeGiB is defined -%}
+{%- set enableRootDisk = storage is defined and storage.os is defined and storage.os.sizeGiB is defined -%}
 {%- set hasExtraManifests = cluster.manifests or cluster.mirrors or enableTPM or enableTang or isKubevirt or enableDisconnected or insecureMirrors or enableRootDisk -%}
 {%- set generatedDiscoveryIgnitionOverride = "" -%}
 {%- if hasMirrorRegistries -%}
