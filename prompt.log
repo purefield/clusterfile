@@ -4749,3 +4749,8 @@ Rendered `virt.ola.clusterfile` through `acm-ztp.yaml.tpl` with and without `roo
 > it would make way more sense to follow our pattern how we do global networking configuration
 
 Moved the option from `cluster.rootDisk` to a new top-level `storage` section, mirroring `network` (cluster-wide) vs `hosts.<name>.network` (per host): `storage.os.{sizeGiB, partitionLabel}` sets the layout for every node, while `hosts.<name>.storage.os` still picks the disk. Schema, include, acm-ztp, install-config, tests and the LVM plugin description updated; the editor gains a Storage sidebar entry (its form is schema-driven). Verified: 203 passed, 1 xfailed; `virt.ola.clusterfile` with `storage.os.sizeGiB: 120` renders and validates (`startMiB: 122880`); unset, the render is identical to main; `sizeGiB: 10` is rejected. Editor run from source with a headless browser: the Storage section renders OS Disk Layout with both fields, no page errors (`run-dev.sh` lacks `PLUGINS_DIR`, so the schema endpoint fails when run from source -- noted, not fixed).
+
+### Prompt 520
+> ship it
+
+Shipped v3.26.0 following `.claude/skills/ship-it` (versioned editor release, run manually as for v3.25.3). Added `storage.os` to the README's optional-sections example. Moved the unpushed feature tag `root-disk-partition` to the final feature commit, merged `feature/root-disk-partition` into main with --no-ff, synced the five version locations, committed `Release v3.26.0`, tagged `v3.26.0`. Verification and deploy results are recorded below the release commit in the session report.

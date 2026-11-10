@@ -25,7 +25,7 @@ const isStandaloneMode = (
 const API_BASE = window.location.origin;
 
 // Application version (fetched from backend or embedded)
-let APP_VERSION = '3.25.3';
+let APP_VERSION = '3.26.0';
 
 // Embedded data for standalone mode (populated by build-standalone.sh)
 let EMBEDDED_SCHEMA = null;
@@ -108,6 +108,14 @@ function getTemplateIcon(category) {
 
 // Changelog data - KEEP THIS UPDATED with each release
 const CHANGELOG = [
+  {
+    version: '3.26.0',
+    date: '2026-11-10',
+    changes: [
+      'New Storage section: storage.os.sizeGiB caps the CoreOS root partition at install time and leaves the rest of the boot disk as an empty partition for LVM (/dev/disk/by-partlabel/lvmstorage)',
+      'Rendered for ACM ZTP (extraclustermanifests) and agent installs (openshift/ manifests); new installs only'
+    ]
+  },
   {
     version: '3.25.3',
     date: '2026-10-23',

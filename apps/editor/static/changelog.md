@@ -1,5 +1,9 @@
 # Clusterfile Editor Changelog
 
+## 3.26.0
+- New **Storage** section, the cluster-wide counterpart of Network: `storage.os.sizeGiB` caps the CoreOS root partition when a cluster is installed and leaves the rest of the boot disk as an empty partition for LVM. Point an LVM Storage device class at `/dev/disk/by-partlabel/lvmstorage` to use it.
+- Works for ACM ZTP and agent-based installs; existing nodes keep their full-size root until reinstalled.
+
 ## 3.25.3
 - LVM operator policies now follow the cluster's OpenShift minor version (stable-4.22 on 4.22) instead of defaulting to "stable", which is not an LVMS channel
 - ACM defaults to release-2.17, and cluster image sets track the backplane-2.17 branch
