@@ -103,7 +103,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Required device paths to include in the volume group (e.g. /dev/vdb, /dev/nvme0n1)."
+                "description": "Required device paths to include in the volume group (e.g. /dev/vdb, /dev/nvme0n1, or /dev/disk/by-partlabel/lvmstorage for the partition storage.os reserves)."
               },
               "optionalPaths": {
                 "title": "Optional Paths",

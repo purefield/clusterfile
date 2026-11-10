@@ -373,6 +373,33 @@ class TestInstallConfigTemplate:
         rendered = template.render(data)
         return yaml.safe_load(rendered)
 
+    def test_root_disk_partition_agent_documents(self, template_env):
+        """The agent path emits one root-disk MachineConfig per pool for the openshift/ directory."""
+        data = base_cluster_data()
+        data['storage'] = {'os': {'sizeGiB': 120}}
+        template = template_env.get_template('install-config.yaml.tpl')
+        docs = [d for d in yaml.safe_load_all(template.render(data)) if d]
+        mcs = {d['metadata']['name']: d for d in docs if d.get('kind') == 'MachineConfig'}
+        assert set(mcs) >= {'98-master-root-disk-partition', '98-worker-root-disk-partition'}
+        part = mcs['98-master-root-disk-partition']['spec']['config']['storage']['disks'][0]['partitions'][0]
+        assert part['startMiB'] == 122880 and part['number'] == 5
+
+    def test_root_disk_unset_agent_documents(self, template_env):
+        template = template_env.get_template('install-config.yaml.tpl')
+        docs = [d for d in yaml.safe_load_all(template.render(base_cluster_data())) if d]
+        assert not [d for d in docs if d.get('kind') == 'MachineConfig' and 'root-disk' in d['metadata']['name']]
+
+    def test_root_disk_schema(self):
+        """sizeGiB is required and at least 25; unknown keys are rejected."""
+        import json, jsonschema
+        schema_path = os.path.join(os.path.dirname(__file__), '..', 'schema', 'clusterfile.schema.json')
+        sub = json.load(open(schema_path))['properties']['storage']['properties']['os']
+        jsonschema.validate({'sizeGiB': 120}, sub)
+        jsonschema.validate({'sizeGiB': 25, 'partitionLabel': 'lvmstorage'}, sub)
+        for bad in ({'sizeGiB': 10}, {}, {'sizeGiB': 120, 'size': 1}, {'sizeGiB': 120, 'partitionLabel': 'has space'}):
+            with pytest.raises(jsonschema.ValidationError):
+                jsonschema.validate(bad, sub)
+
     def test_aws_platform(self, template_env):
         """Test AWS platform configuration."""
         data = base_cluster_data()
@@ -1458,6 +1485,62 @@ class TestAcmZtpTemplate:
         assert cm is not None, "extraclustermanifests ConfigMap not found"
         assert '99-tpm-disk-encryption.yaml' in cm['data']
         assert 'tpm2: true' in cm['data']['99-tpm-disk-encryption.yaml']
+
+    def test_root_disk_unset_adds_nothing(self, template_env):
+        """Without storage.os there is no root-disk MachineConfig and no extra ConfigMap."""
+        data = self.acm_ztp_data(platform='baremetal')
+        result = self.render_template(template_env, data)
+        assert self.get_configmap(result, 'extraclustermanifests') is None
+        aci = [i for i in result['items'] if i['kind'] == 'AgentClusterInstall'][0]
+        assert 'manifestsConfigMapRef' not in aci['spec']
+
+    def test_root_disk_partition_master(self, template_env):
+        """storage.os caps root and reserves the rest of the boot disk as partition 5."""
+        data = self.acm_ztp_data(platform='baremetal')
+        data['storage'] = {'os': {'sizeGiB': 120}}
+        result = self.render_template(template_env, data)
+
+        aci = [i for i in result['items'] if i['kind'] == 'AgentClusterInstall'][0]
+        assert aci['spec']['manifestsConfigMapRef']['name'] == 'extraclustermanifests'
+        cm = self.get_configmap(result, 'extraclustermanifests')
+        assert '98-master-root-disk-partition.yaml' in cm['data']
+        assert '98-worker-root-disk-partition.yaml' not in cm['data'], "compact cluster has no worker pool"
+        mc = yaml.safe_load(cm['data']['98-master-root-disk-partition.yaml'])
+        assert mc['metadata']['labels']['machineconfiguration.openshift.io/role'] == 'master'
+        disk = mc['spec']['config']['storage']['disks'][0]
+        assert disk['device'] == '/dev/disk/by-id/coreos-boot-disk'
+        assert disk['wipeTable'] is False
+        assert disk['partitions'] == [{'label': 'lvmstorage', 'number': 5, 'startMiB': 122880, 'sizeMiB': 0}]
+
+    def test_root_disk_partition_custom_label(self, template_env):
+        data = self.acm_ztp_data(platform='baremetal')
+        data['storage'] = {'os': {'sizeGiB': 200, 'partitionLabel': 'nvme-lvm'}}
+        cm = self.get_configmap(self.render_template(template_env, data), 'extraclustermanifests')
+        part = yaml.safe_load(cm['data']['98-master-root-disk-partition.yaml'])['spec']['config']['storage']['disks'][0]['partitions'][0]
+        assert part['label'] == 'nvme-lvm'
+        assert part['startMiB'] == 204800
+
+    def test_root_disk_partition_worker_pool(self, template_env):
+        """Clusters with workers get a worker MachineConfig too."""
+        import copy
+        data = self.acm_ztp_data(platform='baremetal')
+        worker = copy.deepcopy(data['hosts']['node1.ztp-test.example.com'])
+        worker['role'] = 'worker'
+        worker['network']['primary']['address'] = '10.0.0.9'
+        data['hosts']['worker1.ztp-test.example.com'] = worker
+        data['storage'] = {'os': {'sizeGiB': 120}}
+        cm = self.get_configmap(self.render_template(template_env, data), 'extraclustermanifests')
+        mc = yaml.safe_load(cm['data']['98-worker-root-disk-partition.yaml'])
+        assert mc['metadata']['labels']['machineconfiguration.openshift.io/role'] == 'worker'
+        assert mc['metadata']['name'] == '98-worker-root-disk-partition'
+
+    def test_root_disk_partition_with_tpm(self, template_env):
+        """Root-disk partitioning and TPM encryption coexist in one ConfigMap."""
+        data = self.acm_ztp_data(platform='baremetal', tpm=True)
+        data['storage'] = {'os': {'sizeGiB': 120}}
+        cm = self.get_configmap(self.render_template(template_env, data), 'extraclustermanifests')
+        assert '99-tpm-disk-encryption.yaml' in cm['data']
+        assert '98-master-root-disk-partition.yaml' in cm['data']
 
     def test_tpm_manifest_kubevirt(self, template_env):
         """Test that TPM manifest appears in extraclustermanifests for kubevirt with cluster.tpm: true."""

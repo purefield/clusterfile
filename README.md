@@ -219,6 +219,11 @@ network:
       ports: [eth1]
       subnet: 192.168.1.0/24
 
+storage:
+  os:                                       # Boot disk layout for every node (install time only)
+    sizeGiB: 120                            # Cap root; rest of the disk -> empty partition 5
+    partitionLabel: lvmstorage              # LVMS path: /dev/disk/by-partlabel/lvmstorage
+
 plugins:
   kubevirt:                                 # Platform plugin (KubeVirt example)
     storageClass:

@@ -3,6 +3,9 @@
 All notable changes to this project are documented in this file.
 
 ## Unreleased
+- Schema/templates: new top-level `storage` section, the cluster-wide counterpart of `network` (per-host disk choice stays in `hosts.<name>.storage.os`). `storage.os.sizeGiB` caps the CoreOS root partition at install time and reserves the rest of the boot disk as an empty partition 5 (`partitionLabel`, default `lvmstorage`) for LVM, e.g. an LVMS device class on `/dev/disk/by-partlabel/lvmstorage`. Emitted as `98-<role>-root-disk-partition` MachineConfigs on `/dev/disk/by-id/coreos-boot-disk` -- in the `extraclustermanifests` ConfigMap for acm-ztp, and as `openshift/` documents in install-config for agent installs. Not available for capi (day-2 manifests cannot repartition a booted disk). New installs only. Tag `root-disk-partition`.
+- Editor: Storage section in the sidebar.
+- Templates: acm-ztp computes the `extraclustermanifests` condition once (`hasExtraManifests`) instead of repeating it on two lines.
 
 ## v3.25.3 (2026-10-23)
 - Plugins: the LVM policy derives its channel from `cluster.version` (`stable-<minor>`), matching the LVM manifests template. It previously defaulted to `stable`, which is not an LVMS channel. Tag `operator-channels-4.22`.

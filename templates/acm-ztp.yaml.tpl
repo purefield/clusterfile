@@ -37,6 +37,8 @@ docs: https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_manageme
 {%- set osImageHost = disc.osImageHost | default("") -%}
 {%- set hasMirrorRegistries = cluster.mirrors | default([]) | length > 0 -%}
 {%- set insecureMirrors = cluster.mirrors | default([]) | selectattr('insecure', 'defined') | selectattr('insecure') | list -%}
+{%- set enableRootDisk = storage is defined and storage.os is defined and storage.os.sizeGiB is defined -%}
+{%- set hasExtraManifests = cluster.manifests or cluster.mirrors or enableTPM or enableTang or isKubevirt or enableDisconnected or insecureMirrors or enableRootDisk -%}
 {%- set generatedDiscoveryIgnitionOverride = "" -%}
 {%- if hasMirrorRegistries -%}
 {%- set generatedDiscoveryIgnitionOverride %}{% include "includes/disconnected-discovery-ignition-override.json.tpl" %}{% endset -%}
@@ -99,9 +101,9 @@ items:
     provisionRequirements:
       controlPlaneAgents: {{ controlCount }}
       workerAgents: {{ workerCount }}
-    sshPublicKey: '{{load_file(cluster.sshKeys|first)|safe}}'{% if cluster.manifests or cluster.mirrors or enableTPM or enableTang or isKubevirt or enableDisconnected or insecureMirrors %}
+    sshPublicKey: '{{load_file(cluster.sshKeys|first)|safe}}'{% if hasExtraManifests %}
     manifestsConfigMapRef:
-      name: extraclustermanifests{% endif %}{% if cluster.mirrors %}{% include "includes/mirror-registries-configmap.yaml.tpl" %}{% endif %}{% if cluster.manifests or cluster.mirrors or enableTPM or enableTang or isKubevirt or enableDisconnected or insecureMirrors %}
+      name: extraclustermanifests{% endif %}{% if cluster.mirrors %}{% include "includes/mirror-registries-configmap.yaml.tpl" %}{% endif %}{% if hasExtraManifests %}
 - kind: ConfigMap
   apiVersion: v1
   metadata:
@@ -113,7 +115,9 @@ items:
     99-tpm-disk-encryption.yaml: |
 {{ tpmManifest | indent(8, true) }}{% endif %}{% if enableTang %}{%- set tangManifest %}{% include "includes/tang-machineconfig.yaml.tpl" %}{% endset %}
     99-tang-disk-encryption.yaml: |
-{{ tangManifest | indent(8, true) }}{% endif %}{% if isKubevirt %}{%- set ssdUdev %}{% include "includes/kubevirt-ssd-udev.yaml.tpl" %}{% endset %}
+{{ tangManifest | indent(8, true) }}{% endif %}{% if enableRootDisk %}{% for rootDiskRole in ['master'] + (['worker'] if workerCount > 0 else []) %}{%- set rootDiskManifest %}{% include "includes/root-disk-partition.yaml.tpl" %}{% endset %}
+    98-{{ rootDiskRole }}-root-disk-partition.yaml: |
+{{ rootDiskManifest | indent(8, true) }}{% endfor %}{% endif %}{% if isKubevirt %}{%- set ssdUdev %}{% include "includes/kubevirt-ssd-udev.yaml.tpl" %}{% endset %}
     99-ssd-rotational.yaml: |
 {{ ssdUdev | indent(8, true) }}{% endif %}{% if cluster.mirrors %}{%- set sources %}{% include "includes/imageContentSource.yaml.tpl" %}{% endset %}
     99-image-digest-mirror-set.yaml: |
